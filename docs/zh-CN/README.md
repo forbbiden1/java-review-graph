@@ -27,6 +27,8 @@
     本地开发环境说明和当前构建注意事项。
 11. [roadmap.md](./roadmap.md)
     里程碑顺序。
+12. [todo.md](./todo.md)
+    按优先级整理的 MVP 后续待办。
 
 ## 文档分工
 
@@ -39,7 +41,7 @@
 - 前端：
   `web-design.md`
 - 开发辅助：
-  `dev-setup.md`、`roadmap.md`
+  `dev-setup.md`、`roadmap.md`、`todo.md`
 
 ## 维护规则
 

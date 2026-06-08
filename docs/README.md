@@ -29,6 +29,8 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
     Local development setup and current build notes.
 11. [roadmap.md](./roadmap.md)
     Milestone order.
+12. [todo.md](./todo.md)
+    Prioritized post-MVP follow-up work.
 
 ## Document Roles
 
@@ -41,7 +43,7 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
 - Frontend:
   `web-design.md`
 - Execution support:
-  `dev-setup.md`, `roadmap.md`
+  `dev-setup.md`, `roadmap.md`, `todo.md`
 
 ## Current Rule
 

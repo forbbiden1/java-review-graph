@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: java-review-graph-server
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:./data/java-review-graph.db
+    hikari:
+      maximum-pool-size: 1
+      connection-test-query: select 1
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/sqlite/schema.sql
+
+server:
+  port: 8080
+
+app:
+  review-graph:
+    storage-mode: sqlite
+    snapshot-mode: manual

@@ -1,0 +1,22 @@
+.idea/
+.vscode/
+target/
+out/
+node_modules/
+dist/
+.m2/
+.DS_Store
+Thumbs.db
+*.iml
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+
+# Local runtime files
+data/*
+!data/.gitkeep
+tmp/
+.tmp/

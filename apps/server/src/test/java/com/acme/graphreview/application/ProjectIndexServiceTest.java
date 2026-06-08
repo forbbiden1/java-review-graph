@@ -3,6 +3,7 @@ package com.acme.graphreview.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.acme.analyzer.parser.AnalysisRequest;
@@ -529,6 +530,73 @@ class ProjectIndexServiceTest {
         assertTrue(result.analysisSnapshot().note().startsWith("Incremental Git diff collected 1 changed path(s)"));
     }
 
+    @Test
+    void storesGitIncrementalSnapshotAsUncommittedWhenWorkspaceChangesAreIncluded() throws Exception {
+        Path sourceRoot = tempDir.resolve(Path.of("src", "main", "java", "demo"));
+        java.nio.file.Files.createDirectories(sourceRoot);
+        java.nio.file.Files.writeString(sourceRoot.resolve("Service.java"), "package demo; class Service {}");
+
+        RegisteredProject project = new RegisteredProject(
+                "project-1",
+                "demo",
+                tempDir.toString(),
+                "maven",
+                Instant.now(),
+                Instant.now()
+        );
+        ProjectSnapshot previousSnapshot = new ProjectSnapshot(
+                "snapshot-0",
+                project.id(),
+                null,
+                "manual",
+                "abcdef1234567890",
+                "Baseline",
+                "snapshot-0",
+                "completed",
+                Instant.now()
+        );
+
+        SymbolRecord currentService = typeSymbol("type:root:demo.Service", "demo.Service", "Service", "api-service-v1", "impl-service-v2");
+        AnalysisSnapshot incrementalSnapshot = new AnalysisSnapshot(
+                "snapshot-1",
+                project.id(),
+                Instant.now(),
+                List.of(file("src/main/java/demo/Service.java")),
+                List.of(currentService),
+                List.of(),
+                "incremental"
+        );
+
+        StubJdtProjectAnalyzer analyzer = new StubJdtProjectAnalyzer(incrementalSnapshot);
+        StubGitSnapshotMetadataResolver gitResolver = new StubGitSnapshotMetadataResolver();
+        gitResolver.metadata = new GitSnapshotMetadata("fedcba9876543210", "Committed head");
+        gitResolver.changedFiles = GitChangedFiles.available(
+                List.of("src/main/java/demo/Service.java"),
+                "Incremental Git diff collected 1 changed path(s) from the current working tree based on commit abcdef12.",
+                true
+        );
+
+        ProjectIndexService service = new ProjectIndexService(
+                new StubProjectService(project),
+                new InMemorySnapshotRepository(previousSnapshot),
+                new InMemorySourceFileRepository(Map.of(previousSnapshot.id(), List.of())),
+                new InMemorySymbolRepository(Map.of(previousSnapshot.id(), List.of())),
+                new InMemoryRelationRepository(Map.of(previousSnapshot.id(), List.of())),
+                new InMemorySymbolChangeRepository(),
+                new StubProjectDescriptorFactory(project),
+                analyzer,
+                gitResolver
+        );
+
+        ProjectIndexResult result = service.indexProject(
+                project.id(),
+                new ProjectIndexCommand("incremental", "git", List.of())
+        );
+
+        assertNull(result.snapshot().gitCommit());
+        assertNull(result.snapshot().gitCommitMessage());
+    }
+
     private static SymbolRecord typeSymbol(String symbolKey, String qualifiedName, String name, String apiHash, String implHash) {
         return new SymbolRecord(
                 symbolKey,
@@ -610,13 +678,14 @@ class ProjectIndexServiceTest {
     }
 
     private static final class StubGitSnapshotMetadataResolver extends GitSnapshotMetadataResolver {
+        private GitSnapshotMetadata metadata = GitSnapshotMetadata.uncommitted();
         private GitChangedFiles changedFiles = GitChangedFiles.available(List.of(), "git");
         private Path lastChangedFilesRootPath;
         private String lastBaseCommit;
 
         @Override
         public GitSnapshotMetadata resolve(Path rootPath) {
-            return GitSnapshotMetadata.uncommitted();
+            return metadata;
         }
 
         @Override

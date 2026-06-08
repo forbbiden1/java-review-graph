@@ -43,6 +43,7 @@ public class GitSnapshotMetadataResolver {
 
         LinkedHashSet<String> changedPaths = new LinkedHashSet<>();
         String headCommit = runGit(rootPath, List.of("git", "rev-parse", "HEAD")).orElse(null);
+        boolean includesWorkspaceChanges = false;
 
         if (baseCommit != null && headCommit != null) {
             changedPaths.addAll(runGitNullSeparated(
@@ -52,18 +53,24 @@ public class GitSnapshotMetadataResolver {
         }
 
         if (headCommit != null) {
-            changedPaths.addAll(runGitNullSeparated(rootPath, List.of("git", "diff", "--name-only", "-z", "HEAD", "--")));
-            changedPaths.addAll(runGitNullSeparated(
+            List<String> workspaceDiffPaths = runGitNullSeparated(rootPath, List.of("git", "diff", "--name-only", "-z", "HEAD", "--"));
+            List<String> untrackedPaths = runGitNullSeparated(
                     rootPath,
                     List.of("git", "ls-files", "--others", "--exclude-standard", "-z")
-            ));
+            );
+            includesWorkspaceChanges = !workspaceDiffPaths.isEmpty() || !untrackedPaths.isEmpty();
+            changedPaths.addAll(workspaceDiffPaths);
+            changedPaths.addAll(untrackedPaths);
         } else {
-            changedPaths.addAll(readStatusPaths(rootPath));
+            List<String> statusPaths = readStatusPaths(rootPath);
+            includesWorkspaceChanges = !statusPaths.isEmpty();
+            changedPaths.addAll(statusPaths);
         }
 
         return GitChangedFiles.available(
                 List.copyOf(changedPaths),
-                buildChangedFilesNote(baseCommit, headCommit, changedPaths.size())
+                buildChangedFilesNote(baseCommit, headCommit, changedPaths.size()),
+                includesWorkspaceChanges
         );
     }
 

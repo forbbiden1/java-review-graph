@@ -82,7 +82,6 @@ public class ProjectIndexService {
         ProjectSnapshot previousSnapshot = snapshotRepository.findLatestByProjectId(project.id()).orElse(null);
         String previousSnapshotId = previousSnapshot == null ? null : previousSnapshot.id();
         String snapshotId = UUID.randomUUID().toString();
-        GitSnapshotMetadata gitMetadata = gitSnapshotMetadataResolver.resolve(descriptor.rootPath());
         ResolvedChangedFiles resolvedChangedFiles = resolveChangedFiles(
                 descriptor.rootPath(),
                 incremental,
@@ -90,6 +89,12 @@ public class ProjectIndexService {
                 requestedChangedFiles,
                 previousSnapshot
         );
+        GitSnapshotMetadata gitMetadata = gitSnapshotMetadataResolver.resolve(descriptor.rootPath());
+        GitSnapshotMetadata snapshotGitMetadata = shouldStoreSnapshotAsUncommitted(
+                incremental,
+                incrementalChangeSource,
+                resolvedChangedFiles.includesWorkspaceChanges()
+        ) ? GitSnapshotMetadata.uncommitted() : gitMetadata;
         List<StoredSourceFile> previousFiles = previousSnapshotId == null
                 ? List.of()
                 : sourceFileRepository.findByProjectIdAndSnapshotId(project.id(), previousSnapshotId);
@@ -133,8 +138,8 @@ public class ProjectIndexService {
                 project.id(),
                 previousSnapshotId,
                 "manual",
-                gitMetadata.gitCommit(),
-                gitMetadata.gitCommitMessage(),
+                snapshotGitMetadata.gitCommit(),
+                snapshotGitMetadata.gitCommitMessage(),
                 snapshotId,
                 "completed",
                 Instant.now()
@@ -240,14 +245,14 @@ public class ProjectIndexService {
             ProjectSnapshot previousSnapshot
     ) {
         if (!incremental) {
-            return new ResolvedChangedFiles(List.of(), null);
+            return new ResolvedChangedFiles(List.of(), null, false);
         }
 
         if (incrementalChangeSource == IncrementalChangeSource.MANUAL) {
             if (requestedChangedFiles.isEmpty()) {
                 throw new ProjectValidationException("Manual incremental index mode requires at least one changed file.");
             }
-            return new ResolvedChangedFiles(requestedChangedFiles, null);
+            return new ResolvedChangedFiles(requestedChangedFiles, null, false);
         }
 
         GitChangedFiles gitChangedFiles = gitSnapshotMetadataResolver.resolveChangedFiles(
@@ -257,7 +262,21 @@ public class ProjectIndexService {
         if (!gitChangedFiles.available()) {
             throw new ProjectValidationException(gitChangedFiles.note());
         }
-        return new ResolvedChangedFiles(gitChangedFiles.paths(), gitChangedFiles.note());
+        return new ResolvedChangedFiles(
+                gitChangedFiles.paths(),
+                gitChangedFiles.note(),
+                gitChangedFiles.includesWorkspaceChanges()
+        );
+    }
+
+    private boolean shouldStoreSnapshotAsUncommitted(
+            boolean incremental,
+            IncrementalChangeSource incrementalChangeSource,
+            boolean includesWorkspaceChanges
+    ) {
+        return incremental
+                && incrementalChangeSource == IncrementalChangeSource.GIT
+                && includesWorkspaceChanges;
     }
 
     private Map<String, String> buildFileIdByPath(List<StoredSourceFile> storedFiles) {
@@ -794,7 +813,8 @@ public class ProjectIndexService {
 
     private record ResolvedChangedFiles(
             List<String> paths,
-            String notePrefix
+            String notePrefix,
+            boolean includesWorkspaceChanges
     ) {
     }
 

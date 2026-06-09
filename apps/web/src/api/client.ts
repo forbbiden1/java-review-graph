@@ -19,6 +19,28 @@ export type ProjectSnapshot = {
   createdAt: string;
 };
 
+export type SnapshotDiagnostics = {
+  id: string;
+  projectId: string;
+  baseSnapshotId: string | null;
+  triggerType: string;
+  gitCommit: string | null;
+  gitCommitMessage: string | null;
+  displayName: string;
+  status: string;
+  createdAt: string;
+  requestedMode: string | null;
+  effectiveMode: string | null;
+  changeSource: string | null;
+  includesWorkspaceChanges: boolean;
+  note: string | null;
+  fallbackReason: string | null;
+  changedFiles: string[];
+  renamedPaths: string[];
+  rebuildPaths: string[];
+  removedPaths: string[];
+};
+
 export type GraphNode = {
   id: string;
   name: string;
@@ -136,6 +158,12 @@ export function deleteProject(projectId: string) {
 
 export function listSnapshots(projectId: string) {
   return request<ProjectSnapshot[]>(`/api/projects/${encodeURIComponent(projectId)}/snapshots`);
+}
+
+export function getSnapshotDiagnostics(projectId: string, snapshotId: string) {
+  return request<SnapshotDiagnostics>(
+    `/api/projects/${encodeURIComponent(projectId)}/snapshots/${encodeURIComponent(snapshotId)}/diagnostics`
+  );
 }
 
 export function renameSnapshot(projectId: string, snapshotId: string, payload: { displayName: string }) {

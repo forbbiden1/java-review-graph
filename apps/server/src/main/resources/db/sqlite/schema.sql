@@ -19,6 +19,16 @@ create table if not exists snapshot (
   git_commit_message text,
   display_name text not null,
   status text not null,
+  requested_mode text not null default 'full',
+  effective_mode text not null default 'full',
+  change_source text,
+  includes_workspace_changes integer not null default 0,
+  diagnostics_note text,
+  fallback_reason text,
+  changed_files_json text not null default '[]',
+  renamed_paths_json text not null default '[]',
+  rebuild_paths_json text not null default '[]',
+  removed_paths_json text not null default '[]',
   created_at text not null
 );
 

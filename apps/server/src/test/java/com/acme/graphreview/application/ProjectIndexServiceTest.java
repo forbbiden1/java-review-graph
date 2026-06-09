@@ -138,6 +138,15 @@ class ProjectIndexServiceTest {
                 Set.of("src/main/java/demo/Service.java", "src/main/java/demo/Controller.java"),
                 Set.copyOf(analyzer.lastRequest.changedFiles())
         );
+        assertEquals("incremental", result.snapshot().requestedMode());
+        assertEquals("incremental", result.snapshot().effectiveMode());
+        assertEquals("manual", result.snapshot().changeSource());
+        assertEquals(List.of("src/main/java/demo/Service.java"), result.snapshot().changedFiles());
+        assertEquals(
+                Set.of("src/main/java/demo/Service.java", "src/main/java/demo/Controller.java"),
+                Set.copyOf(result.snapshot().rebuildPaths())
+        );
+        assertTrue(result.snapshot().removedPaths().isEmpty());
         assertEquals(ChangeStatus.MODIFIED_IMPL, statusBySymbolKey.get(currentService.symbolKey()));
         assertEquals(ChangeStatus.IMPACTED, statusBySymbolKey.get(currentController.symbolKey()));
 
@@ -223,6 +232,9 @@ class ProjectIndexServiceTest {
                 "Incremental request contained no Java source changes; reused previous snapshot data.",
                 result.analysisSnapshot().note()
         );
+        assertEquals(List.of("README.md"), result.snapshot().changedFiles());
+        assertTrue(result.snapshot().rebuildPaths().isEmpty());
+        assertTrue(result.snapshot().removedPaths().isEmpty());
         assertTrue(symbolChangeRepository.savedChanges.isEmpty());
 
         List<SymbolRecord> storedCurrentSymbols = symbolRepository.findByProjectIdAndSnapshotId(project.id(), result.snapshot().id());
@@ -313,6 +325,10 @@ class ProjectIndexServiceTest {
                 "Incremental fallback: build configuration changed, so a full scan was executed.",
                 result.analysisSnapshot().note()
         );
+        assertEquals("incremental", result.snapshot().requestedMode());
+        assertEquals("full", result.snapshot().effectiveMode());
+        assertEquals("Build configuration changed.", result.snapshot().fallbackReason());
+        assertEquals(List.of("pom.xml"), result.snapshot().changedFiles());
     }
 
     @Test
@@ -411,6 +427,9 @@ class ProjectIndexServiceTest {
                 "Incremental snapshot rebuilt 1 Java file(s) and removed 1 file(s).",
                 result.analysisSnapshot().note()
         );
+        assertEquals(List.of("src/main/java/demo/Service.java"), result.snapshot().changedFiles());
+        assertEquals(List.of("src/main/java/demo/Controller.java"), result.snapshot().rebuildPaths());
+        assertEquals(List.of("src/main/java/demo/Service.java"), result.snapshot().removedPaths());
 
         List<SymbolRecord> storedCurrentSymbols = symbolRepository.findByProjectIdAndSnapshotId(project.id(), result.snapshot().id());
         assertEquals(1, storedCurrentSymbols.size());
@@ -428,6 +447,124 @@ class ProjectIndexServiceTest {
         assertTrue(
                 symbolChangeRepository.savedChanges.stream().anyMatch(change ->
                         change.symbolKey().equals(previousService.symbolKey()) && change.changeType().equals("deleted"))
+        );
+    }
+
+    @Test
+    void gitRenameRemovesOldSnapshotPathAndRebuildsRenamedFile() throws Exception {
+        Path sourceRoot = tempDir.resolve(Path.of("src", "main", "java", "demo"));
+        Path renamedRoot = tempDir.resolve(Path.of("src", "main", "java", "demo", "renamed"));
+        java.nio.file.Files.createDirectories(sourceRoot);
+        java.nio.file.Files.createDirectories(renamedRoot);
+        java.nio.file.Files.writeString(sourceRoot.resolve("Controller.java"), "package demo; class Controller {}");
+        java.nio.file.Files.writeString(renamedRoot.resolve("Service.java"), "package demo; class Service {}");
+
+        RegisteredProject project = new RegisteredProject(
+                "project-1",
+                "demo",
+                tempDir.toString(),
+                "maven",
+                Instant.now(),
+                Instant.now()
+        );
+        ProjectSnapshot previousSnapshot = new ProjectSnapshot(
+                "snapshot-0",
+                project.id(),
+                null,
+                "manual",
+                "abcdef1234567890",
+                "Baseline",
+                "snapshot-0",
+                "completed",
+                Instant.now()
+        );
+
+        SymbolRecord previousService = typeSymbolAtPath(
+                "type:root:demo.Service",
+                "demo.Service",
+                "Service",
+                "src/main/java/demo/Service.java",
+                "api-service-v1",
+                "impl-service-v1"
+        );
+        SymbolRecord previousController = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller", "api-controller-v1", "impl-controller-v1");
+        RelationRecord previousUses = relation(previousController.symbolKey(), previousService.symbolKey(), RelationType.USES_TYPE);
+
+        SymbolRecord currentService = typeSymbolAtPath(
+                "type:root:demo.Service",
+                "demo.Service",
+                "Service",
+                "src/main/java/demo/renamed/Service.java",
+                "api-service-v1",
+                "impl-service-v2"
+        );
+        SymbolRecord currentController = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller", "api-controller-v1", "impl-controller-v1");
+        AnalysisSnapshot incrementalSnapshot = new AnalysisSnapshot(
+                "snapshot-1",
+                project.id(),
+                Instant.now(),
+                List.of(file("src/main/java/demo/renamed/Service.java"), file("src/main/java/demo/Controller.java")),
+                List.of(currentService, currentController),
+                List.of(relation(currentController.symbolKey(), currentService.symbolKey(), RelationType.USES_TYPE)),
+                "incremental"
+        );
+
+        InMemorySnapshotRepository snapshotRepository = new InMemorySnapshotRepository(previousSnapshot);
+        InMemorySymbolRepository symbolRepository = new InMemorySymbolRepository(Map.of(previousSnapshot.id(), List.of(previousService, previousController)));
+        InMemoryRelationRepository relationRepository = new InMemoryRelationRepository(Map.of(previousSnapshot.id(), List.of(previousUses)));
+        InMemorySymbolChangeRepository symbolChangeRepository = new InMemorySymbolChangeRepository();
+        InMemorySourceFileRepository sourceFileRepository = new InMemorySourceFileRepository(Map.of(
+                previousSnapshot.id(),
+                List.of(
+                        new StoredSourceFile("prev-service-file", "src/main/java/demo/Service.java", "root", "demo", "content-hash-service", "main"),
+                        new StoredSourceFile("prev-controller-file", "src/main/java/demo/Controller.java", "root", "demo", "content-hash-controller", "main")
+                )
+        ));
+        StubJdtProjectAnalyzer analyzer = new StubJdtProjectAnalyzer(incrementalSnapshot);
+        StubGitSnapshotMetadataResolver gitResolver = new StubGitSnapshotMetadataResolver();
+        gitResolver.changedFiles = GitChangedFiles.available(
+                List.of("src/main/java/demo/Service.java", "src/main/java/demo/renamed/Service.java"),
+                List.of("src/main/java/demo/Service.java -> src/main/java/demo/renamed/Service.java"),
+                "Incremental Git diff collected 2 changed path(s) from the current working tree based on commit abcdef12.",
+                true
+        );
+
+        ProjectIndexService service = new ProjectIndexService(
+                new StubProjectService(project),
+                snapshotRepository,
+                sourceFileRepository,
+                symbolRepository,
+                relationRepository,
+                symbolChangeRepository,
+                new StubProjectDescriptorFactory(project),
+                analyzer,
+                gitResolver
+        );
+
+        ProjectIndexResult result = service.indexProject(
+                project.id(),
+                new ProjectIndexCommand("incremental", "git", List.of())
+        );
+
+        assertEquals(
+                Set.of("src/main/java/demo/renamed/Service.java", "src/main/java/demo/Controller.java"),
+                Set.copyOf(analyzer.lastRequest.changedFiles())
+        );
+        assertEquals(
+                List.of("src/main/java/demo/Service.java", "src/main/java/demo/renamed/Service.java"),
+                result.snapshot().changedFiles()
+        );
+        assertEquals(
+                List.of("src/main/java/demo/Service.java -> src/main/java/demo/renamed/Service.java"),
+                result.snapshot().renamedPaths()
+        );
+        assertEquals(List.of("src/main/java/demo/Service.java"), result.snapshot().removedPaths());
+        assertTrue(result.snapshot().diagnosticsNote().contains("Detected rename/move"));
+
+        List<StoredSourceFile> storedFiles = sourceFileRepository.findByProjectIdAndSnapshotId(project.id(), result.snapshot().id());
+        assertEquals(
+                Set.of("src/main/java/demo/renamed/Service.java", "src/main/java/demo/Controller.java"),
+                storedFiles.stream().map(StoredSourceFile::path).collect(java.util.stream.Collectors.toSet())
         );
     }
 
@@ -527,6 +664,8 @@ class ProjectIndexServiceTest {
                 Set.of("src/main/java/demo/Service.java", "src/main/java/demo/Controller.java"),
                 Set.copyOf(analyzer.lastRequest.changedFiles())
         );
+        assertEquals("git", result.snapshot().changeSource());
+        assertEquals(List.of("src/main/java/demo/Service.java"), result.snapshot().changedFiles());
         assertTrue(result.analysisSnapshot().note().startsWith("Incremental Git diff collected 1 changed path(s)"));
     }
 
@@ -595,9 +734,28 @@ class ProjectIndexServiceTest {
 
         assertNull(result.snapshot().gitCommit());
         assertNull(result.snapshot().gitCommitMessage());
+        assertTrue(result.snapshot().includesWorkspaceChanges());
     }
 
     private static SymbolRecord typeSymbol(String symbolKey, String qualifiedName, String name, String apiHash, String implHash) {
+        return typeSymbolAtPath(
+                symbolKey,
+                qualifiedName,
+                name,
+                "src/main/java/demo/" + name + ".java",
+                apiHash,
+                implHash
+        );
+    }
+
+    private static SymbolRecord typeSymbolAtPath(
+            String symbolKey,
+            String qualifiedName,
+            String name,
+            String filePath,
+            String apiHash,
+            String implHash
+    ) {
         return new SymbolRecord(
                 symbolKey,
                 SymbolType.TYPE,
@@ -608,7 +766,7 @@ class ProjectIndexServiceTest {
                 qualifiedName,
                 name,
                 qualifiedName,
-                "src/main/java/demo/" + name + ".java",
+                filePath,
                 1,
                 20,
                 apiHash,

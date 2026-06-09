@@ -96,9 +96,11 @@
 - 当 `changeSource = git` 时，会从最新快照对应的 commit 对比到当前工作区，自动收集变更路径
 - 自动增量模式还会把当前未提交改动和未跟踪文件一起纳入变更集合
 - 会规范化变更的 Java 路径，并把上一份快照中一跳关联的文件加入重建集合
+- 会显式识别 Git rename / move 对，并把它们持久化到快照诊断信息里
 - 如果没有上一份快照，或检测到构建元数据变化，会回退到全量扫描
 - 如果增量请求里没有 Java 源码变更，则直接复用上一份快照数据
 - 创建并持久化一条快照记录
+- 会持久化快照诊断信息，包括请求模式、实际模式、变更来源、变更文件、重建范围和回退原因
 - 新快照的 `displayName` 默认等于快照 UUID
 - 当项目根目录处于干净 Git 工作树时，保存当前 `gitCommit` 和 `gitCommitMessage`
 - 当存在未提交改动或无法读取 Git 信息时，保存 `gitCommit = null` 和 `gitCommitMessage = null`
@@ -115,6 +117,17 @@
 - 按 `createdAt desc` 返回快照列表
 - 每个快照都包含 `gitCommit`、`gitCommitMessage` 和 `displayName`
 - 未提交或非 Git 场景下，前两个字段返回 `null`
+
+### 查询快照诊断信息
+
+`GET /api/projects/{projectId}/snapshots/{snapshotId}/diagnostics`
+
+当前行为：
+
+- 返回所选快照持久化保存的诊断元数据
+- 包括 `requestedMode`、`effectiveMode` 和 `changeSource`
+- 包括 `changedFiles`、`renamedPaths`、`rebuildPaths` 和 `removedPaths`
+- 包括 `note`、`fallbackReason` 和 `includesWorkspaceChanges`
 
 ### 重命名单个快照
 

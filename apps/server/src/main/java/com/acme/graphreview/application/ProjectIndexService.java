@@ -95,6 +95,8 @@ public class ProjectIndexService {
                 incrementalChangeSource,
                 resolvedChangedFiles.includesWorkspaceChanges()
         ) ? GitSnapshotMetadata.uncommitted() : gitMetadata;
+        String requestedMode = incremental ? "incremental" : "full";
+        String changeSource = incremental ? incrementalChangeSource.name().toLowerCase(Locale.ROOT) : null;
         List<StoredSourceFile> previousFiles = previousSnapshotId == null
                 ? List.of()
                 : sourceFileRepository.findByProjectIdAndSnapshotId(project.id(), previousSnapshotId);
@@ -108,6 +110,7 @@ public class ProjectIndexService {
                 descriptor,
                 incremental,
                 resolvedChangedFiles.paths(),
+                resolvedChangedFiles.renamedPaths(),
                 resolvedChangedFiles.notePrefix(),
                 previousSnapshotId,
                 previousFiles,
@@ -137,12 +140,22 @@ public class ProjectIndexService {
                 snapshotId,
                 project.id(),
                 previousSnapshotId,
-                "manual",
+                incremental ? changeSource : "manual",
                 snapshotGitMetadata.gitCommit(),
                 snapshotGitMetadata.gitCommitMessage(),
                 snapshotId,
                 "completed",
-                Instant.now()
+                Instant.now(),
+                requestedMode,
+                incrementalPlan.incremental() ? "incremental" : "full",
+                changeSource,
+                resolvedChangedFiles.includesWorkspaceChanges(),
+                buildDiagnosticsNote(incremental, incrementalPlan),
+                incrementalPlan.fallbackReason(),
+                incrementalPlan.changedFiles(),
+                resolvedChangedFiles.renamedPaths(),
+                incrementalPlan.rebuildPaths(),
+                incrementalPlan.removedPaths()
         );
 
         ProjectSnapshot savedSnapshot = snapshotRepository.save(snapshot);
@@ -176,6 +189,12 @@ public class ProjectIndexService {
     public List<ProjectSnapshot> listSnapshots(String projectId) {
         projectService.getProject(projectId);
         return snapshotRepository.findByProjectId(projectId);
+    }
+
+    public ProjectSnapshot getSnapshotDiagnostics(String projectId, String snapshotId) {
+        projectService.getProject(projectId);
+        return snapshotRepository.findByProjectIdAndSnapshotId(projectId, snapshotId)
+                .orElseThrow(() -> new SnapshotNotFoundException(projectId));
     }
 
     @Transactional
@@ -237,6 +256,23 @@ public class ProjectIndexService {
         return displayName.trim();
     }
 
+    private String buildDiagnosticsNote(boolean incrementalRequested, IncrementalPlan incrementalPlan) {
+        String note = incrementalRequested
+                ? incrementalPlan.noteOverride()
+                : "Full index requested; scanned all discovered Java source files.";
+        return withIncrementalNotePrefix(note, buildRenameSummary(incrementalPlan.renamedPaths()));
+    }
+
+    private String buildRenameSummary(List<String> renamedPaths) {
+        if (renamedPaths == null || renamedPaths.isEmpty()) {
+            return null;
+        }
+        if (renamedPaths.size() == 1) {
+            return "Detected rename/move: " + renamedPaths.get(0) + ".";
+        }
+        return "Detected " + renamedPaths.size() + " rename/move path(s).";
+    }
+
     private ResolvedChangedFiles resolveChangedFiles(
             Path rootPath,
             boolean incremental,
@@ -245,14 +281,14 @@ public class ProjectIndexService {
             ProjectSnapshot previousSnapshot
     ) {
         if (!incremental) {
-            return new ResolvedChangedFiles(List.of(), null, false);
+            return new ResolvedChangedFiles(List.of(), List.of(), null, false);
         }
 
         if (incrementalChangeSource == IncrementalChangeSource.MANUAL) {
             if (requestedChangedFiles.isEmpty()) {
                 throw new ProjectValidationException("Manual incremental index mode requires at least one changed file.");
             }
-            return new ResolvedChangedFiles(requestedChangedFiles, null, false);
+            return new ResolvedChangedFiles(requestedChangedFiles, List.of(), null, false);
         }
 
         GitChangedFiles gitChangedFiles = gitSnapshotMetadataResolver.resolveChangedFiles(
@@ -264,6 +300,7 @@ public class ProjectIndexService {
         }
         return new ResolvedChangedFiles(
                 gitChangedFiles.paths(),
+                gitChangedFiles.renamedPaths(),
                 gitChangedFiles.note(),
                 gitChangedFiles.includesWorkspaceChanges()
         );
@@ -291,40 +328,41 @@ public class ProjectIndexService {
             ProjectDescriptor descriptor,
             boolean incrementalRequested,
             List<String> changedFiles,
+            List<String> renamedPaths,
             String changedFilesNotePrefix,
             String previousSnapshotId,
             List<StoredSourceFile> previousFiles,
             List<SymbolRecord> previousSymbols,
             List<RelationRecord> previousRelations
     ) {
+        LinkedHashSet<String> normalizedChangedPaths = normalizeChangedPaths(descriptor.rootPath(), changedFiles);
         if (!incrementalRequested) {
-            return IncrementalPlan.full(null);
+            return IncrementalPlan.full(List.of(), List.of(), null, null);
         }
         if (previousSnapshotId == null) {
-            return IncrementalPlan.full(withIncrementalNotePrefix(
-                    changedFilesNotePrefix,
-                    "Incremental fallback: no previous snapshot was available, so a full scan was executed."
-            ));
+            return IncrementalPlan.full(
+                    List.copyOf(normalizedChangedPaths),
+                    List.copyOf(renamedPaths),
+                    withIncrementalNotePrefix(
+                            changedFilesNotePrefix,
+                            "Incremental fallback: no previous snapshot was available, so a full scan was executed."
+                    ),
+                    "No previous snapshot was available."
+            );
         }
 
-        LinkedHashSet<String> normalizedChangedPaths = new LinkedHashSet<>();
-        boolean buildMetadataChanged = false;
-        for (String changedFile : changedFiles) {
-            String normalizedPath = normalizeChangedPath(descriptor.rootPath(), changedFile);
-            if (normalizedPath == null) {
-                continue;
-            }
-            normalizedChangedPaths.add(normalizedPath);
-            if (isBuildMetadataPath(normalizedPath)) {
-                buildMetadataChanged = true;
-            }
-        }
+        boolean buildMetadataChanged = normalizedChangedPaths.stream().anyMatch(this::isBuildMetadataPath);
 
         if (buildMetadataChanged) {
-            return IncrementalPlan.full(withIncrementalNotePrefix(
-                    changedFilesNotePrefix,
-                    "Incremental fallback: build configuration changed, so a full scan was executed."
-            ));
+            return IncrementalPlan.full(
+                    List.copyOf(normalizedChangedPaths),
+                    List.copyOf(renamedPaths),
+                    withIncrementalNotePrefix(
+                            changedFilesNotePrefix,
+                            "Incremental fallback: build configuration changed, so a full scan was executed."
+                    ),
+                    "Build configuration changed."
+            );
         }
 
         LinkedHashSet<String> changedJavaPaths = normalizedChangedPaths.stream()
@@ -332,8 +370,11 @@ public class ProjectIndexService {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (changedJavaPaths.isEmpty()) {
             return IncrementalPlan.incremental(
+                    List.copyOf(normalizedChangedPaths),
+                    List.copyOf(renamedPaths),
                     List.of(),
                     Set.of(),
+                    List.of(),
                     withIncrementalNotePrefix(
                             changedFilesNotePrefix,
                             "Incremental request contained no Java source changes; reused previous snapshot data."
@@ -378,12 +419,22 @@ public class ProjectIndexService {
         LinkedHashSet<String> replacedPaths = expandedPaths.stream()
                 .filter(path -> previousFilesByPath.containsKey(path) || rebuildPaths.contains(path))
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        LinkedHashSet<String> removedPaths = replacedPaths.stream()
+                .filter(path -> !rebuildPaths.contains(path))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         String note = withIncrementalNotePrefix(
                 changedFilesNotePrefix,
                 buildIncrementalPlanNote(rebuildPaths, replacedPaths)
         );
-        return IncrementalPlan.incremental(List.copyOf(rebuildPaths), Set.copyOf(replacedPaths), note);
+        return IncrementalPlan.incremental(
+                List.copyOf(normalizedChangedPaths),
+                List.copyOf(renamedPaths),
+                List.copyOf(rebuildPaths),
+                Set.copyOf(replacedPaths),
+                List.copyOf(removedPaths),
+                note
+        );
     }
 
     private AnalysisSnapshot mergeIncrementalSnapshot(
@@ -542,6 +593,17 @@ public class ProjectIndexService {
             return null;
         }
         return rootPath.relativize(absolutePath).toString().replace('\\', '/');
+    }
+
+    private LinkedHashSet<String> normalizeChangedPaths(Path rootPath, List<String> changedFiles) {
+        LinkedHashSet<String> normalizedChangedPaths = new LinkedHashSet<>();
+        for (String changedFile : changedFiles) {
+            String normalizedPath = normalizeChangedPath(rootPath, changedFile);
+            if (normalizedPath != null) {
+                normalizedChangedPaths.add(normalizedPath);
+            }
+        }
+        return normalizedChangedPaths;
     }
 
     private boolean fileExists(Path rootPath, String relativePath) {
@@ -798,21 +860,48 @@ public class ProjectIndexService {
     private record IncrementalPlan(
             boolean incremental,
             boolean skipAnalysis,
+            List<String> changedFiles,
+            List<String> renamedPaths,
             List<String> rebuildPaths,
             Set<String> replacedPaths,
-            String noteOverride
+            List<String> removedPaths,
+            String noteOverride,
+            String fallbackReason
     ) {
-        private static IncrementalPlan full(String noteOverride) {
-            return new IncrementalPlan(false, false, List.of(), Set.of(), noteOverride);
+        private static IncrementalPlan full(
+                List<String> changedFiles,
+                List<String> renamedPaths,
+                String noteOverride,
+                String fallbackReason
+        ) {
+            return new IncrementalPlan(false, false, changedFiles, renamedPaths, List.of(), Set.of(), List.of(), noteOverride, fallbackReason);
         }
 
-        private static IncrementalPlan incremental(List<String> rebuildPaths, Set<String> replacedPaths, String noteOverride) {
-            return new IncrementalPlan(true, rebuildPaths.isEmpty(), rebuildPaths, replacedPaths, noteOverride);
+        private static IncrementalPlan incremental(
+                List<String> changedFiles,
+                List<String> renamedPaths,
+                List<String> rebuildPaths,
+                Set<String> replacedPaths,
+                List<String> removedPaths,
+                String noteOverride
+        ) {
+            return new IncrementalPlan(
+                    true,
+                    rebuildPaths.isEmpty(),
+                    changedFiles,
+                    renamedPaths,
+                    rebuildPaths,
+                    replacedPaths,
+                    removedPaths,
+                    noteOverride,
+                    null
+            );
         }
     }
 
     private record ResolvedChangedFiles(
             List<String> paths,
+            List<String> renamedPaths,
             String notePrefix,
             boolean includesWorkspaceChanges
     ) {

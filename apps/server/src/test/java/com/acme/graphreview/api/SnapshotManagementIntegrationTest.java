@@ -2,6 +2,7 @@ package com.acme.graphreview.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -88,6 +89,29 @@ class SnapshotManagementIntegrationTest {
         assertEquals(0, countRows("symbol_change", "snapshot_id", snapshotId));
     }
 
+    @Test
+    void getSnapshotDiagnosticsReturnsPersistedIncrementalMetadata() throws Exception {
+        String projectId = "project-snapshot-diagnostics";
+        String snapshotId = "snapshot-diagnostics-1";
+        String now = Instant.now().toString();
+
+        insertProject(projectId, now);
+        insertSnapshotWithDiagnostics(projectId, snapshotId, now);
+
+        mockMvc.perform(get("/api/projects/{projectId}/snapshots/{snapshotId}/diagnostics", projectId, snapshotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(snapshotId))
+                .andExpect(jsonPath("$.requestedMode").value("incremental"))
+                .andExpect(jsonPath("$.effectiveMode").value("full"))
+                .andExpect(jsonPath("$.changeSource").value("git"))
+                .andExpect(jsonPath("$.includesWorkspaceChanges").value(true))
+                .andExpect(jsonPath("$.fallbackReason").value("Build configuration changed."))
+                .andExpect(jsonPath("$.changedFiles[0]").value("pom.xml"))
+                .andExpect(jsonPath("$.renamedPaths[0]").value("src/main/java/demo/Old.java -> src/main/java/demo/New.java"))
+                .andExpect(jsonPath("$.rebuildPaths").isEmpty())
+                .andExpect(jsonPath("$.removedPaths").isEmpty());
+    }
+
     private void insertProject(String projectId, String now) {
         jdbcTemplate.update(
                 """
@@ -120,6 +144,38 @@ class SnapshotManagementIntegrationTest {
                 displayName,
                 "completed",
                 now
+        );
+    }
+
+    private void insertSnapshotWithDiagnostics(String projectId, String snapshotId, String now) {
+        jdbcTemplate.update(
+                """
+                insert into snapshot (
+                    id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at,
+                    requested_mode, effective_mode, change_source, includes_workspace_changes, diagnostics_note,
+                    fallback_reason, changed_files_json, renamed_paths_json, rebuild_paths_json, removed_paths_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                snapshotId,
+                projectId,
+                "snapshot-base-1",
+                "git",
+                null,
+                null,
+                "Incremental Review",
+                "completed",
+                now,
+                "incremental",
+                "full",
+                "git",
+                1,
+                "Incremental fallback: build configuration changed, so a full scan was executed.",
+                "Build configuration changed.",
+                "[\"pom.xml\"]",
+                "[\"src/main/java/demo/Old.java -> src/main/java/demo/New.java\"]",
+                "[]",
+                "[]"
         );
     }
 

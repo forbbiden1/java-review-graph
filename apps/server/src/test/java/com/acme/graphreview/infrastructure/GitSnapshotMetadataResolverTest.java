@@ -106,6 +106,25 @@ class GitSnapshotMetadataResolverTest {
     }
 
     @Test
+    void resolveChangedFilesDetectsRenamePathsExplicitly() throws IOException, InterruptedException {
+        assumeGitAvailable();
+        initializeRepository(tempDir);
+
+        Files.writeString(tempDir.resolve("OldName.java"), "class OldName {}");
+        runGit(tempDir, "git", "add", "OldName.java");
+        runGit(tempDir, "git", "commit", "-m", "Base snapshot");
+        String baseCommit = readGit(tempDir, "git", "rev-parse", "HEAD");
+
+        runGit(tempDir, "git", "mv", "OldName.java", "NewName.java");
+
+        GitChangedFiles changedFiles = resolver.resolveChangedFiles(tempDir, baseCommit);
+
+        assertTrue(changedFiles.available());
+        assertEquals(List.of("OldName.java", "NewName.java"), changedFiles.paths());
+        assertEquals(List.of("OldName.java -> NewName.java"), changedFiles.renamedPaths());
+    }
+
+    @Test
     void resolveChangedFilesReturnsUnavailableForNonGitDirectory() throws IOException, InterruptedException {
         Path nonGitDir = Path.of(System.getProperty("user.home"))
                 .resolve(".java-review-graph-non-git-" + UUID.randomUUID());

@@ -42,33 +42,42 @@ public class GitSnapshotMetadataResolver {
         }
 
         LinkedHashSet<String> changedPaths = new LinkedHashSet<>();
+        LinkedHashSet<String> renamedPaths = new LinkedHashSet<>();
         String headCommit = runGit(rootPath, List.of("git", "rev-parse", "HEAD")).orElse(null);
         boolean includesWorkspaceChanges = false;
 
         if (baseCommit != null && headCommit != null) {
-            changedPaths.addAll(runGitNullSeparated(
+            ParsedGitChanges committedChanges = runGitNameStatus(
                     rootPath,
-                    List.of("git", "diff", "--name-only", "-z", baseCommit, headCommit, "--")
-            ));
+                    List.of("git", "diff", "--name-status", "--find-renames", "-z", baseCommit, headCommit, "--")
+            );
+            changedPaths.addAll(committedChanges.paths());
+            renamedPaths.addAll(committedChanges.renamedPaths());
         }
 
         if (headCommit != null) {
-            List<String> workspaceDiffPaths = runGitNullSeparated(rootPath, List.of("git", "diff", "--name-only", "-z", "HEAD", "--"));
+            ParsedGitChanges workspaceDiffChanges = runGitNameStatus(
+                    rootPath,
+                    List.of("git", "diff", "--name-status", "--find-renames", "-z", "HEAD", "--")
+            );
             List<String> untrackedPaths = runGitNullSeparated(
                     rootPath,
                     List.of("git", "ls-files", "--others", "--exclude-standard", "-z")
             );
-            includesWorkspaceChanges = !workspaceDiffPaths.isEmpty() || !untrackedPaths.isEmpty();
-            changedPaths.addAll(workspaceDiffPaths);
+            includesWorkspaceChanges = !workspaceDiffChanges.paths().isEmpty() || !untrackedPaths.isEmpty();
+            changedPaths.addAll(workspaceDiffChanges.paths());
+            renamedPaths.addAll(workspaceDiffChanges.renamedPaths());
             changedPaths.addAll(untrackedPaths);
         } else {
-            List<String> statusPaths = readStatusPaths(rootPath);
-            includesWorkspaceChanges = !statusPaths.isEmpty();
-            changedPaths.addAll(statusPaths);
+            ParsedGitChanges statusChanges = readStatusPaths(rootPath);
+            includesWorkspaceChanges = !statusChanges.paths().isEmpty();
+            changedPaths.addAll(statusChanges.paths());
+            renamedPaths.addAll(statusChanges.renamedPaths());
         }
 
         return GitChangedFiles.available(
                 List.copyOf(changedPaths),
+                List.copyOf(renamedPaths),
                 buildChangedFilesNote(baseCommit, headCommit, changedPaths.size()),
                 includesWorkspaceChanges
         );
@@ -159,22 +168,122 @@ public class GitSnapshotMetadataResolver {
         }
     }
 
-    private List<String> readStatusPaths(Path rootPath) {
-        return runGit(rootPath, List.of("git", "status", "--porcelain"))
-                .stream()
-                .flatMap(output -> output.lines())
-                .map(String::trim)
-                .filter(line -> line.length() >= 4)
-                .map(line -> {
-                    String path = line.substring(3);
+    private ParsedGitChanges runGitNameStatus(Path rootPath, List<String> command) {
+        Process process = null;
+        try {
+            process = new ProcessBuilder(command)
+                    .directory(rootPath.toFile())
+                    .redirectErrorStream(true)
+                    .start();
+
+            boolean completed = process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!completed) {
+                process.destroyForcibly();
+                LOGGER.debug("Timed out while collecting git name-status for {}", rootPath);
+                return ParsedGitChanges.empty();
+            }
+
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (process.exitValue() != 0) {
+                LOGGER.debug("Git command failed in {}: {} -> {}", rootPath, String.join(" ", command), output.trim());
+                return ParsedGitChanges.empty();
+            }
+
+            return parseNameStatusOutput(output);
+        } catch (IOException | InterruptedException exception) {
+            if (exception instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            LOGGER.debug("Unable to collect git name-status for {}", rootPath, exception);
+            return ParsedGitChanges.empty();
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
+    }
+
+    private ParsedGitChanges readStatusPaths(Path rootPath) {
+        LinkedHashSet<String> paths = new LinkedHashSet<>();
+        LinkedHashSet<String> renamedPaths = new LinkedHashSet<>();
+        runGit(rootPath, List.of("git", "status", "--porcelain"))
+                .ifPresent(output -> output.lines()
+                        .map(String::trim)
+                        .filter(line -> line.length() >= 4)
+                        .forEach(line -> {
+                    String path = line.substring(3).trim().replace('\\', '/');
                     int renameSeparator = path.lastIndexOf(" -> ");
                     if (renameSeparator >= 0) {
-                        path = path.substring(renameSeparator + 4);
+                        String fromPath = path.substring(0, renameSeparator).trim().replace('\\', '/');
+                        String toPath = path.substring(renameSeparator + 4).trim().replace('\\', '/');
+                        if (!fromPath.isBlank()) {
+                            paths.add(fromPath);
+                        }
+                        if (!toPath.isBlank()) {
+                            paths.add(toPath);
+                        }
+                        if (!fromPath.isBlank() && !toPath.isBlank()) {
+                            renamedPaths.add(fromPath + " -> " + toPath);
+                        }
+                        return;
                     }
-                    return path.trim().replace('\\', '/');
-                })
-                .filter(path -> !path.isBlank())
-                .toList();
+                    if (!path.isBlank()) {
+                        paths.add(path);
+                    }
+                        }));
+        return new ParsedGitChanges(List.copyOf(paths), List.copyOf(renamedPaths));
+    }
+
+    private ParsedGitChanges parseNameStatusOutput(String output) {
+        if (output.isEmpty()) {
+            return ParsedGitChanges.empty();
+        }
+
+        LinkedHashSet<String> paths = new LinkedHashSet<>();
+        LinkedHashSet<String> renamedPaths = new LinkedHashSet<>();
+        String[] tokens = output.split("\0");
+        int index = 0;
+        while (index < tokens.length) {
+            String statusToken = tokens[index].trim();
+            index += 1;
+            if (statusToken.isBlank()) {
+                continue;
+            }
+
+            char statusCode = statusToken.charAt(0);
+            if (statusCode == 'R') {
+                if (index + 1 >= tokens.length) {
+                    break;
+                }
+                String fromPath = normalizeGitPath(tokens[index]);
+                String toPath = normalizeGitPath(tokens[index + 1]);
+                index += 2;
+                if (!fromPath.isBlank()) {
+                    paths.add(fromPath);
+                }
+                if (!toPath.isBlank()) {
+                    paths.add(toPath);
+                }
+                if (!fromPath.isBlank() && !toPath.isBlank()) {
+                    renamedPaths.add(fromPath + " -> " + toPath);
+                }
+                continue;
+            }
+
+            if (index >= tokens.length) {
+                break;
+            }
+            String path = normalizeGitPath(tokens[index]);
+            index += 1;
+            if (!path.isBlank()) {
+                paths.add(path);
+            }
+        }
+        return new ParsedGitChanges(List.copyOf(paths), List.copyOf(renamedPaths));
+    }
+
+    private String normalizeGitPath(String path) {
+        return path == null ? "" : path.trim().replace('\\', '/');
     }
 
     private String buildChangedFilesNote(String baseCommit, String headCommit, int pathCount) {
@@ -202,5 +311,11 @@ public class GitSnapshotMetadataResolver {
             return "unknown";
         }
         return commit.length() <= 8 ? commit : commit.substring(0, 8);
+    }
+
+    private record ParsedGitChanges(List<String> paths, List<String> renamedPaths) {
+        private static ParsedGitChanges empty() {
+            return new ParsedGitChanges(List.of(), List.of());
+        }
     }
 }

@@ -96,9 +96,11 @@ Current behavior:
 - when `changeSource = git`, collects changed paths from the latest snapshot commit to the current workspace state
 - also includes current uncommitted and untracked Git changes in automatic incremental mode
 - normalizes changed Java paths and expands the rebuild set with one-hop related files from the previous snapshot
+- detects Git rename or move pairs and persists them explicitly in snapshot diagnostics
 - falls back to a full scan when no previous snapshot exists or build metadata changed
 - reuses previous snapshot data unchanged when an incremental request contains no Java source changes
 - creates a persisted snapshot record
+- persists snapshot diagnostics for the requested mode, effective mode, change source, changed files, rebuild scope, and fallback reason
 - sets `displayName` to the snapshot UUID by default
 - when the project root is a clean Git work tree, stores the current `gitCommit` and `gitCommitMessage`
 - when the work tree has uncommitted changes or Git metadata is unavailable, stores `gitCommit = null` and `gitCommitMessage = null`
@@ -115,6 +117,17 @@ Current behavior:
 - returns snapshots ordered by `createdAt desc`
 - each snapshot includes `gitCommit`, `gitCommitMessage`, and `displayName`
 - uncommitted or non-Git snapshots return those two fields as `null`
+
+### Query snapshot diagnostics
+
+`GET /api/projects/{projectId}/snapshots/{snapshotId}/diagnostics`
+
+Current behavior:
+
+- returns the persisted diagnostics metadata for the selected snapshot
+- includes `requestedMode`, `effectiveMode`, and `changeSource`
+- includes `changedFiles`, `renamedPaths`, `rebuildPaths`, and `removedPaths`
+- includes `note`, `fallbackReason`, and `includesWorkspaceChanges`
 
 ### Rename one snapshot
 

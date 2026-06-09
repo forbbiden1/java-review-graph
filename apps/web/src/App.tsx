@@ -6,6 +6,7 @@ import {
   deleteSnapshot,
   getChanges,
   getClassGraph,
+  getSnapshotDiagnostics,
   getMethodGraph,
   listProjects,
   listSnapshots,
@@ -16,6 +17,7 @@ import {
   type MethodGraph,
   type Project,
   type ProjectSnapshot,
+  type SnapshotDiagnostics,
   type SymbolChange
 } from "./api/client";
 import { GraphCanvas } from "./graph/GraphCanvas";
@@ -55,6 +57,7 @@ function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [snapshotDiagnostics, setSnapshotDiagnostics] = useState<SnapshotDiagnostics | null>(null);
   const [collapsedSnapshotGroupKeys, setCollapsedSnapshotGroupKeys] = useState<string[]>([]);
   const [classGraph, setClassGraph] = useState<ClassGraph | null>(null);
   const [methodGraph, setMethodGraph] = useState<MethodGraph | null>(null);
@@ -70,6 +73,7 @@ function App() {
   const [changedFilesText, setChangedFilesText] = useState("");
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
+  const [loadingSnapshotDiagnostics, setLoadingSnapshotDiagnostics] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
   const [submittingIndex, setSubmittingIndex] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
@@ -88,6 +92,7 @@ function App() {
 
   const copy = getCopy(settings.language);
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const selectedSnapshot = snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? null;
   const manualChangedFiles = parseChangedFilesText(changedFilesText);
   const snapshotGroups = buildSnapshotGroups(snapshots, settings.language);
   const filteredClassGraph = filterClassGraph(classGraph, classGraphSearchQuery, classGraphDisplayMode);
@@ -97,6 +102,7 @@ function App() {
   const selectedMethod = methodNodes.find((node) => node.id === selectedMethodId) ?? null;
   const selectedChange = changes.find((change) => change.symbolKey === selectedMethodId || change.symbolKey === selectedClassId) ?? null;
   const snapshotUiCopy = getSnapshotUiCopy(settings.language);
+  const snapshotDiagnosticsCopy = getSnapshotDiagnosticsCopy(settings.language);
   const contextMenuCopy = getContextMenuCopy(settings.language);
   const classGraphSearchLabel = getClassGraphSearchLabel(settings.language);
   const classGraphSearchPlaceholder = getClassGraphSearchPlaceholder(settings.language);
@@ -259,15 +265,26 @@ function App() {
     workspaceMessageOverride?: string
   ) {
     const activeCopy = getCopy(languageOverride ?? settings.language);
-    const [graph, changeList] = await Promise.all([getClassGraph(projectId, snapshotId), getChanges(projectId, snapshotId)]);
+    setLoadingSnapshotDiagnostics(true);
 
-    setClassGraph(graph);
-    setChanges(changeList);
-    setSelectedSnapshotId(graph.snapshotId);
-    setWorkspaceMessage(
-      workspaceMessageOverride ??
-        activeCopy.messages.snapshotLoaded(shortId(graph.snapshotId), graph.nodes.length, graph.edges.length, changeList.length)
-    );
+    try {
+      const [graph, changeList, diagnostics] = await Promise.all([
+        getClassGraph(projectId, snapshotId),
+        getChanges(projectId, snapshotId),
+        getSnapshotDiagnostics(projectId, snapshotId)
+      ]);
+
+      setClassGraph(graph);
+      setChanges(changeList);
+      setSnapshotDiagnostics(diagnostics);
+      setSelectedSnapshotId(graph.snapshotId);
+      setWorkspaceMessage(
+        workspaceMessageOverride ??
+          activeCopy.messages.snapshotLoaded(shortId(graph.snapshotId), graph.nodes.length, graph.edges.length, changeList.length)
+      );
+    } finally {
+      setLoadingSnapshotDiagnostics(false);
+    }
   }
 
   async function loadProjects(preferredProjectId?: string, languageOverride?: LanguageMode) {
@@ -695,6 +712,8 @@ function App() {
   function clearWorkspace() {
     setSnapshots([]);
     setSelectedSnapshotId(null);
+    setSnapshotDiagnostics(null);
+    setLoadingSnapshotDiagnostics(false);
     setCollapsedSnapshotGroupKeys([]);
     setClassGraph(null);
     setMethodGraph(null);
@@ -1045,6 +1064,18 @@ function App() {
                   />
                 </Panel>
 
+                <Panel title={snapshotDiagnosticsCopy.title} subtitle={snapshotDiagnosticsCopy.subtitle}>
+                  <SnapshotDiagnosticsPanel
+                    diagnostics={snapshotDiagnostics}
+                    emptyBody={snapshotDiagnosticsCopy.emptyBody}
+                    emptyTitle={snapshotDiagnosticsCopy.emptyTitle}
+                    labels={snapshotDiagnosticsCopy}
+                    language={settings.language}
+                    loading={loadingSnapshotDiagnostics}
+                    selectedSnapshot={selectedSnapshot}
+                  />
+                </Panel>
+
                 <Panel title={copy.panels.reviewNotesTitle} subtitle={copy.panels.reviewNotesSubtitle}>
                   <ul className="review-note-list">
                     {copy.copy.reviewNotes.map((note) => (
@@ -1290,6 +1321,117 @@ function SelectionCard({ title, subtitle, status, statusLabel, kind, detail }: S
       <code>{subtitle}</code>
       <p>{detail}</p>
     </article>
+  );
+}
+
+type SnapshotDiagnosticsPanelProps = {
+  diagnostics: SnapshotDiagnostics | null;
+  emptyBody: string;
+  emptyTitle: string;
+  labels: SnapshotDiagnosticsCopy;
+  language: LanguageMode;
+  loading: boolean;
+  selectedSnapshot: ProjectSnapshot | null;
+};
+
+function SnapshotDiagnosticsPanel({
+  diagnostics,
+  emptyBody,
+  emptyTitle,
+  labels,
+  language,
+  loading,
+  selectedSnapshot
+}: SnapshotDiagnosticsPanelProps) {
+  if (loading) {
+    return <EmptyState title={labels.loadingTitle} body={labels.loadingBody} />;
+  }
+
+  if (!selectedSnapshot) {
+    return <EmptyState title={emptyTitle} body={emptyBody} />;
+  }
+
+  if (!diagnostics) {
+    return <EmptyState title={labels.unavailableTitle} body={labels.unavailableBody} />;
+  }
+
+  return (
+    <div className="snapshot-diagnostics-shell">
+      <div className="snapshot-diagnostics-grid">
+        <DiagnosticFact
+          label={labels.baseSnapshot}
+          value={diagnostics.baseSnapshotId ? shortId(diagnostics.baseSnapshotId) : labels.none}
+        />
+        <DiagnosticFact
+          label={labels.requestedMode}
+          value={formatSnapshotModeLabel(diagnostics.requestedMode, language, labels)}
+        />
+        <DiagnosticFact
+          label={labels.effectiveMode}
+          value={formatSnapshotModeLabel(diagnostics.effectiveMode, language, labels)}
+        />
+        <DiagnosticFact
+          label={labels.changeSource}
+          value={formatSnapshotChangeSourceLabel(diagnostics.changeSource, language, labels)}
+        />
+        <DiagnosticFact label={labels.workspaceChanges} value={diagnostics.includesWorkspaceChanges ? labels.yes : labels.no} />
+        <DiagnosticFact label={labels.gitCommit} value={diagnostics.gitCommit ? shortId(diagnostics.gitCommit) : labels.none} />
+      </div>
+
+      <div className="list-stack">
+        <article className="selection-card status-unchanged">
+          <div className="selection-head">
+            <span className="status-pill status-unchanged">{labels.summary}</span>
+          </div>
+          <p>{diagnostics.note ?? labels.none}</p>
+        </article>
+
+        <article className={`selection-card ${diagnostics.fallbackReason ? "status-modified_impl" : "status-unchanged"}`}>
+          <div className="selection-head">
+            <span className={`status-pill ${diagnostics.fallbackReason ? "status-modified_impl" : "status-unchanged"}`}>
+              {labels.fallbackReason}
+            </span>
+          </div>
+          <p>{diagnostics.fallbackReason ?? labels.none}</p>
+        </article>
+      </div>
+
+      <DiagnosticPathSection title={labels.changedFiles} paths={diagnostics.changedFiles} emptyLabel={labels.none} />
+      <DiagnosticPathSection title={labels.renamedPaths} paths={diagnostics.renamedPaths} emptyLabel={labels.none} />
+      <DiagnosticPathSection title={labels.rebuildPaths} paths={diagnostics.rebuildPaths} emptyLabel={labels.none} />
+      <DiagnosticPathSection title={labels.removedPaths} paths={diagnostics.removedPaths} emptyLabel={labels.none} />
+    </div>
+  );
+}
+
+function DiagnosticFact({ label, value }: { label: string; value: string }) {
+  return (
+    <article className="diagnostic-fact">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function DiagnosticPathSection({ title, paths, emptyLabel }: { title: string; paths: string[]; emptyLabel: string }) {
+  return (
+    <section className="diagnostic-path-section">
+      <div className="diagnostic-path-header">
+        <strong>{title}</strong>
+        <span>{paths.length}</span>
+      </div>
+      {paths.length === 0 ? (
+        <p className="diagnostic-path-empty">{emptyLabel}</p>
+      ) : (
+        <ul className="diagnostic-path-list">
+          {paths.map((path) => (
+            <li key={`${title}:${path}`}>
+              <code>{path}</code>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -1622,6 +1764,114 @@ type SnapshotGroup = {
   shortCommit: string | null;
   snapshots: ProjectSnapshot[];
 };
+
+type SnapshotDiagnosticsCopy = {
+  baseSnapshot: string;
+  changeSource: string;
+  changedFiles: string;
+  effectiveMode: string;
+  emptyBody: string;
+  emptyTitle: string;
+  fallbackReason: string;
+  gitCommit: string;
+  loadingBody: string;
+  loadingTitle: string;
+  none: string;
+  renamedPaths: string;
+  rebuildPaths: string;
+  removedPaths: string;
+  requestedMode: string;
+  subtitle: string;
+  summary: string;
+  title: string;
+  unavailableBody: string;
+  unavailableTitle: string;
+  workspaceChanges: string;
+  yes: string;
+  no: string;
+};
+
+function formatSnapshotModeLabel(mode: string | null, language: LanguageMode, copy: SnapshotDiagnosticsCopy) {
+  const normalizedMode = mode?.toLowerCase();
+  if (normalizedMode === "incremental") {
+    return language === "zh" ? "增量" : "Incremental";
+  }
+  if (normalizedMode === "full") {
+    return language === "zh" ? "全量" : "Full";
+  }
+  return copy.none;
+}
+
+function formatSnapshotChangeSourceLabel(
+  changeSource: string | null,
+  language: LanguageMode,
+  copy: SnapshotDiagnosticsCopy
+) {
+  const normalizedChangeSource = changeSource?.toLowerCase();
+  if (normalizedChangeSource === "git") {
+    return language === "zh" ? "Git 自动" : "Git Auto";
+  }
+  if (normalizedChangeSource === "manual") {
+    return language === "zh" ? "手工输入" : "Manual";
+  }
+  return copy.none;
+}
+
+function getSnapshotDiagnosticsCopy(language: LanguageMode): SnapshotDiagnosticsCopy {
+  if (language === "zh") {
+    return {
+      baseSnapshot: "基线快照",
+      changeSource: "变更来源",
+      changedFiles: "变更文件",
+      effectiveMode: "实际模式",
+      emptyBody: "选择一个快照后，这里会显示该次索引的诊断信息。",
+      emptyTitle: "还没有快照诊断",
+      fallbackReason: "回退原因",
+      gitCommit: "Git 提交",
+      loadingBody: "正在加载当前快照的诊断元数据。",
+      loadingTitle: "正在加载诊断",
+      no: "否",
+      none: "无",
+      renamedPaths: "重命名 / 移动",
+      rebuildPaths: "重建范围",
+      removedPaths: "移除路径",
+      requestedMode: "请求模式",
+      subtitle: "查看这次索引的变更集合、重建范围和回退说明。",
+      summary: "诊断摘要",
+      title: "索引诊断",
+      unavailableBody: "当前快照没有可用的诊断元数据，可能是旧版本快照。",
+      unavailableTitle: "诊断不可用",
+      workspaceChanges: "包含工作区改动",
+      yes: "是"
+    };
+  }
+
+  return {
+    baseSnapshot: "Base Snapshot",
+    changeSource: "Change Source",
+    changedFiles: "Changed Files",
+    effectiveMode: "Effective Mode",
+    emptyBody: "Choose a snapshot to inspect its indexing diagnostics.",
+    emptyTitle: "No diagnostics yet",
+    fallbackReason: "Fallback Reason",
+    gitCommit: "Git Commit",
+    loadingBody: "Loading persisted diagnostics for the selected snapshot.",
+    loadingTitle: "Loading diagnostics",
+    no: "No",
+    none: "None",
+    renamedPaths: "Renamed / Moved",
+    rebuildPaths: "Rebuild Scope",
+    removedPaths: "Removed Paths",
+    requestedMode: "Requested Mode",
+    subtitle: "Inspect changed files, rebuild scope, and fallback details for the selected snapshot.",
+    summary: "Summary",
+    title: "Index Diagnostics",
+    unavailableBody: "This snapshot does not have persisted diagnostics metadata yet.",
+    unavailableTitle: "Diagnostics unavailable",
+    workspaceChanges: "Workspace Changes",
+    yes: "Yes"
+  };
+}
 
 function getSnapshotUiCopy(language: LanguageMode) {
   if (language === "zh") {

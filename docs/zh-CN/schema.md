@@ -34,6 +34,16 @@
 - `git_commit_message`
 - `display_name`
 - `status`
+- `requested_mode`
+- `effective_mode`
+- `change_source`
+- `includes_workspace_changes`
+- `diagnostics_note`
+- `fallback_reason`
+- `changed_files_json`
+- `renamed_paths_json`
+- `rebuild_paths_json`
+- `removed_paths_json`
 - `created_at`
 
 ### `source_file`

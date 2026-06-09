@@ -22,6 +22,7 @@ project import
 ```text
 changed file list
   -> classify changed files
+  -> detect rename or move pairs and surface both old and new paths in diagnostics
   -> fall back to full scan when no base snapshot or build metadata changed
   -> expand changed Java files with one-hop related files from the previous snapshot
   -> analyze only the rebuild set

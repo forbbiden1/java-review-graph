@@ -16,11 +16,11 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 ## P0: Incremental Index Reliability
 
-- [ ] Persist the actual changed file set for each snapshot.
+- [x] Persist the actual changed file set for each snapshot.
   Done when the UI and API can show which files were used to build an incremental snapshot.
-- [ ] Record why indexing ran in `full` or `incremental` mode.
+- [x] Record why indexing ran in `full` or `incremental` mode.
   Done when fallback reasons such as build-file changes or missing base snapshot are visible.
-- [ ] Handle rename and move scenarios explicitly.
+- [x] Handle rename and move scenarios explicitly.
   Done when file renames do not silently appear as unrelated delete-plus-add without explanation.
 - [ ] Make impact propagation depth configurable.
   Done when one-hop stays the default but deeper propagation can be enabled intentionally.
@@ -31,7 +31,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Suggested split: Git change collection, incremental planning, snapshot assembly, diff calculation, and snapshot metadata.
 - [ ] Isolate graph assembly from transport and persistence concerns.
   Done when indexing logic can be tested without going through controller-level flows.
-- [ ] Add snapshot diagnostics APIs.
+- [x] Add snapshot diagnostics APIs.
   Done when the frontend can query diff base, collected files, fallback reason, and rebuild summary directly.
 
 ## P1: Frontend Refactor
@@ -51,7 +51,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when very large histories remain responsive.
 - [ ] Improve large-graph rendering strategy.
   Candidates: progressive node reveal, edge simplification, staged layout, and viewport-based rendering.
-- [ ] Add an indexing diagnostics panel in the UI.
+- [x] Add an indexing diagnostics panel in the UI.
   Done when users can inspect snapshot source, changed files, fallback reasons, and rebuild scope without reading logs.
 
 ## P2: SQLite and Persistence
@@ -67,7 +67,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 - [ ] Add integration tests for Git-driven incremental indexing.
   Cover committed-only, uncommitted-only, mixed changes, untracked files, and no-base-snapshot flows.
-- [ ] Add rename, delete, and build-file fallback tests.
+- [x] Add rename, delete, and build-file fallback tests.
 - [ ] Add UI smoke tests for key review flows.
   Focus on project import, unsupported-language rejection, graph filtering, fullscreen mode, snapshot rename, and snapshot delete.
 

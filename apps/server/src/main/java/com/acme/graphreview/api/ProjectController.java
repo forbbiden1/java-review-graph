@@ -91,6 +91,16 @@ public class ProjectController {
                 .toList();
     }
 
+    @GetMapping("/{projectId}/snapshots/{snapshotId}/diagnostics")
+    public ProjectSnapshotDiagnosticsResponse getSnapshotDiagnostics(
+            @PathVariable("projectId") String projectId,
+            @PathVariable("snapshotId") String snapshotId
+    ) {
+        return ProjectSnapshotDiagnosticsResponse.from(
+                projectIndexService.getSnapshotDiagnostics(projectId, snapshotId)
+        );
+    }
+
     @PatchMapping("/{projectId}/snapshots/{snapshotId}")
     public ProjectSnapshotResponse renameSnapshot(
             @PathVariable("projectId") String projectId,

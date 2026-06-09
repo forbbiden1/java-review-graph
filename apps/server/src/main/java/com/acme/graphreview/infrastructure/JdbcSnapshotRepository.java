@@ -1,5 +1,8 @@
 package com.acme.graphreview.infrastructure;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.acme.graphreview.application.SnapshotRepository;
 import com.acme.graphreview.domain.ProjectSnapshot;
 import java.sql.ResultSet;
@@ -15,19 +18,25 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcSnapshotRepository implements SnapshotRepository {
 
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {
+    };
     private static final RowMapper<ProjectSnapshot> SNAPSHOT_ROW_MAPPER = new SnapshotRowMapper();
 
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
-    public JdbcSnapshotRepository(JdbcTemplate jdbcTemplate) {
+    public JdbcSnapshotRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override
     public Optional<ProjectSnapshot> findLatestByProjectId(String projectId) {
         return jdbcTemplate.query(
                 """
-                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at
+                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at,
+                       requested_mode, effective_mode, change_source, includes_workspace_changes, diagnostics_note,
+                       fallback_reason, changed_files_json, renamed_paths_json, rebuild_paths_json, removed_paths_json
                 from snapshot
                 where project_id = ?
                 order by created_at desc
@@ -42,7 +51,9 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
     public Optional<ProjectSnapshot> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
         return jdbcTemplate.query(
                 """
-                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at
+                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at,
+                       requested_mode, effective_mode, change_source, includes_workspace_changes, diagnostics_note,
+                       fallback_reason, changed_files_json, renamed_paths_json, rebuild_paths_json, removed_paths_json
                 from snapshot
                 where project_id = ? and id = ?
                 limit 1
@@ -57,7 +68,9 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
     public List<ProjectSnapshot> findByProjectId(String projectId) {
         return jdbcTemplate.query(
                 """
-                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at
+                select id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at,
+                       requested_mode, effective_mode, change_source, includes_workspace_changes, diagnostics_note,
+                       fallback_reason, changed_files_json, renamed_paths_json, rebuild_paths_json, removed_paths_json
                 from snapshot
                 where project_id = ?
                 order by created_at desc
@@ -72,9 +85,11 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
         jdbcTemplate.update(
                 """
                 insert into snapshot (
-                    id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at
+                    id, project_id, base_snapshot_id, trigger_type, git_commit, git_commit_message, display_name, status, created_at,
+                    requested_mode, effective_mode, change_source, includes_workspace_changes, diagnostics_note,
+                    fallback_reason, changed_files_json, renamed_paths_json, rebuild_paths_json, removed_paths_json
                 )
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 snapshot.id(),
                 snapshot.projectId(),
@@ -84,7 +99,17 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
                 snapshot.gitCommitMessage(),
                 snapshot.displayName(),
                 snapshot.status(),
-                snapshot.createdAt().toString()
+                snapshot.createdAt().toString(),
+                snapshot.requestedMode(),
+                snapshot.effectiveMode(),
+                snapshot.changeSource(),
+                snapshot.includesWorkspaceChanges() ? 1 : 0,
+                snapshot.diagnosticsNote(),
+                snapshot.fallbackReason(),
+                writeStringList(snapshot.changedFiles()),
+                writeStringList(snapshot.renamedPaths()),
+                writeStringList(snapshot.rebuildPaths()),
+                writeStringList(snapshot.removedPaths())
         );
         return snapshot;
     }
@@ -132,8 +157,37 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
                     resultSet.getString("git_commit_message"),
                     resultSet.getString("display_name"),
                     resultSet.getString("status"),
-                    Instant.parse(resultSet.getString("created_at"))
+                    Instant.parse(resultSet.getString("created_at")),
+                    resultSet.getString("requested_mode"),
+                    resultSet.getString("effective_mode"),
+                    resultSet.getString("change_source"),
+                    resultSet.getInt("includes_workspace_changes") != 0,
+                    resultSet.getString("diagnostics_note"),
+                    resultSet.getString("fallback_reason"),
+                    readStringList(resultSet.getString("changed_files_json")),
+                    readStringList(resultSet.getString("renamed_paths_json")),
+                    readStringList(resultSet.getString("rebuild_paths_json")),
+                    readStringList(resultSet.getString("removed_paths_json"))
             );
+        }
+    }
+
+    private String writeStringList(List<String> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? List.of() : values);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize snapshot diagnostics paths.", exception);
+        }
+    }
+
+    private static List<String> readStringList(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return new ObjectMapper().readValue(rawJson, STRING_LIST_TYPE);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to parse snapshot diagnostics paths.", exception);
         }
     }
 }

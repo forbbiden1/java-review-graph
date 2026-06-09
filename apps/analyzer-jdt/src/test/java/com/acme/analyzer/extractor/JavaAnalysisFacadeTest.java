@@ -117,4 +117,65 @@ class JavaAnalysisFacadeTest {
         assertTrue(snapshot.files().stream().anyMatch(file -> file.path().endsWith("ChangedType.java")));
         assertFalse(snapshot.files().stream().anyMatch(file -> file.path().endsWith("UnchangedType.java")));
     }
+
+    @Test
+    void analyzeExtractsCrossTypeMethodCallRelationsFromVisibleTypeFallback() throws IOException {
+        Path sourceRoot = tempDir.resolve(Path.of("src", "main", "java", "com", "example"));
+        Files.createDirectories(sourceRoot);
+        Files.writeString(sourceRoot.resolve("Helper.java"), """
+                package com.example;
+
+                class Helper {
+                    void assist(MissingType input) {
+                    }
+                }
+                """);
+        Files.writeString(sourceRoot.resolve("ReviewTarget.java"), """
+                package com.example;
+
+                class ReviewTarget {
+                    void review(Helper helper) {
+                        helper.assist(null);
+                    }
+                }
+                """);
+
+        JavaAnalysisFacade facade = new JavaAnalysisFacade();
+        AnalysisSnapshot snapshot = facade.analyze(
+                new ProjectDescriptor(
+                        "project-1",
+                        "maven",
+                        tempDir,
+                        List.of(),
+                        List.of(tempDir)
+                ),
+                new AnalysisRequest("snapshot-3", false, List.of())
+        );
+
+        String reviewMethodKey = snapshot.symbols().stream()
+                .filter(symbol -> symbol.symbolType() == SymbolType.METHOD)
+                .filter(symbol -> symbol.signature().equals("com.example.ReviewTarget#review(Helper)"))
+                .map(SymbolRecord::symbolKey)
+                .findFirst()
+                .orElseThrow();
+        String helperMethodKey = snapshot.symbols().stream()
+                .filter(symbol -> symbol.symbolType() == SymbolType.METHOD)
+                .filter(symbol -> symbol.signature().equals("com.example.Helper#assist(MissingType)"))
+                .map(SymbolRecord::symbolKey)
+                .findFirst()
+                .orElseThrow();
+
+        assertTrue(
+                snapshot.relations().stream()
+                        .anyMatch(relation -> isCallsRelation(relation, reviewMethodKey, helperMethodKey, "possible")),
+                "expected a calls edge from ReviewTarget.review to Helper.assist but got " + snapshot.relations()
+        );
+    }
+
+    private boolean isCallsRelation(RelationRecord relation, String sourceKey, String targetKey, String confidence) {
+        return relation.relationType() == RelationType.CALLS
+                && relation.sourceSymbolKey().equals(sourceKey)
+                && relation.targetSymbolKey().equals(targetKey)
+                && relation.confidence().equals(confidence);
+    }
 }

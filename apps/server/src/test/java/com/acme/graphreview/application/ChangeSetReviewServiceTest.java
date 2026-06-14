@@ -92,6 +92,10 @@ class ChangeSetReviewServiceTest {
         assertEquals("demo.Service", result.propagationPaths().get(0).fromSymbol().qualifiedName());
         assertEquals("demo.Controller", result.propagationPaths().get(0).toSymbol().qualifiedName());
         assertEquals(RelationType.USES_TYPE, result.propagationPaths().get(0).relationType());
+        assertEquals(2, result.testFocusSuggestions().size());
+        assertEquals("high", result.testFocusSuggestions().get(0).priority());
+        assertEquals("demo.Service", result.testFocusSuggestions().get(0).symbol().qualifiedName());
+        assertEquals("demo.Controller", result.testFocusSuggestions().get(1).symbol().qualifiedName());
         assertTrue(result.summary().contains("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s). Risk level: medium."));
     }
 
@@ -149,6 +153,8 @@ class ChangeSetReviewServiceTest {
         assertTrue(report.markdown().contains("# Change-Set Review Report"));
         assertTrue(report.markdown().contains("## Risk"));
         assertTrue(report.markdown().contains("## Propagation Paths"));
+        assertTrue(report.markdown().contains("## Test Focus Suggestions"));
+        assertTrue(report.markdown().contains("Changed public API should be covered by direct contract tests."));
         assertTrue(report.markdown().contains("`demo.Service` -> `demo.Controller` via `uses_type`"));
         assertTrue(report.markdown().contains("`demo.Service` (`class`, `modified_api`, `changed`)"));
         assertTrue(report.markdown().contains("Public API or deleted symbol changed."));

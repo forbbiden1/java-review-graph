@@ -3,6 +3,7 @@ package com.acme.graphreview.api;
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewResult;
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewSymbol;
 import com.acme.graphreview.application.ChangeSetReviewService.PropagationPath;
+import com.acme.graphreview.application.ChangeSetReviewService.TestFocusSuggestion;
 import java.util.List;
 
 public record ChangeSetReviewResponse(
@@ -17,6 +18,7 @@ public record ChangeSetReviewResponse(
         List<ChangeSetReviewSymbolResponse> impactedSymbols,
         List<ChangeSetReviewSymbolResponse> reviewTargets,
         List<PropagationPathResponse> propagationPaths,
+        List<TestFocusSuggestionResponse> testFocusSuggestions,
         RiskResponse risk,
         String summary
 ) {
@@ -33,6 +35,7 @@ public record ChangeSetReviewResponse(
                 result.impactedSymbols().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
                 result.reviewTargets().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
                 result.propagationPaths().stream().map(PropagationPathResponse::from).toList(),
+                result.testFocusSuggestions().stream().map(TestFocusSuggestionResponse::from).toList(),
                 RiskResponse.from(result.risk()),
                 result.summary()
         );
@@ -82,6 +85,20 @@ public record ChangeSetReviewResponse(
                     path.relationType().name().toLowerCase(),
                     path.filePath(),
                     path.sourceLine()
+            );
+        }
+    }
+
+    public record TestFocusSuggestionResponse(
+            ChangeSetReviewSymbolResponse symbol,
+            String priority,
+            String reason
+    ) {
+        private static TestFocusSuggestionResponse from(TestFocusSuggestion suggestion) {
+            return new TestFocusSuggestionResponse(
+                    ChangeSetReviewSymbolResponse.from(suggestion.symbol()),
+                    suggestion.priority(),
+                    suggestion.reason()
             );
         }
     }

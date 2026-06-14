@@ -96,6 +96,7 @@ public class ChangeSetReviewService {
 
         ChangeSetRiskSummary riskSummary = scoreRisk(changedSymbols, impactedSymbols, persistedChanges, normalizedPaths.size());
         List<ChangeSetReviewSymbol> reviewTargets = buildReviewTargets(changedSymbols, impactedSymbols);
+        List<TestFocusSuggestion> testFocusSuggestions = buildTestFocusSuggestions(changedSymbols, impactedSymbols, propagationPaths, riskSummary);
         String summary = buildSummary(
                 normalizedPaths.size(),
                 changedSymbols.size(),
@@ -116,6 +117,7 @@ public class ChangeSetReviewService {
                 impactedSymbols,
                 reviewTargets,
                 propagationPaths,
+                testFocusSuggestions,
                 riskSummary,
                 summary
         );
@@ -295,6 +297,7 @@ public class ChangeSetReviewService {
         appendPathSection(markdown, "Renamed Paths", result.renamedPaths());
         appendSymbolSection(markdown, "Prioritized Review Targets", result.reviewTargets());
         appendPropagationSection(markdown, "Propagation Paths", result.propagationPaths());
+        appendTestFocusSection(markdown, "Test Focus Suggestions", result.testFocusSuggestions());
         appendSymbolSection(markdown, "Changed Symbols", result.changedSymbols());
         appendSymbolSection(markdown, "Impacted Symbols", result.impactedSymbols());
         return markdown.toString();
@@ -308,6 +311,20 @@ public class ChangeSetReviewService {
         }
         for (String path : paths) {
             markdown.append("- `").append(path).append("`\n");
+        }
+        markdown.append("\n");
+    }
+
+    private void appendTestFocusSection(StringBuilder markdown, String title, List<TestFocusSuggestion> suggestions) {
+        markdown.append("## ").append(title).append("\n\n");
+        if (suggestions.isEmpty()) {
+            markdown.append("- None\n\n");
+            return;
+        }
+        for (TestFocusSuggestion suggestion : suggestions) {
+            markdown.append("- `").append(suggestion.symbol().qualifiedName()).append("`");
+            markdown.append(" [").append(suggestion.priority()).append("] ");
+            markdown.append(suggestion.reason()).append("\n");
         }
         markdown.append("\n");
     }
@@ -380,6 +397,50 @@ public class ChangeSetReviewService {
                 || (relation.targetSymbolKey().equals(changedSymbolKey) && relation.sourceSymbolKey().equals(impactedSymbolKey));
     }
 
+    private List<TestFocusSuggestion> buildTestFocusSuggestions(
+            List<ChangeSetReviewSymbol> changedSymbols,
+            List<ChangeSetReviewSymbol> impactedSymbols,
+            List<PropagationPath> propagationPaths,
+            ChangeSetRiskSummary riskSummary
+    ) {
+        LinkedHashMap<String, TestFocusSuggestion> suggestionsBySymbolKey = new LinkedHashMap<>();
+
+        for (ChangeSetReviewSymbol symbol : changedSymbols) {
+            String priority = "high".equals(riskSummary.riskLevel()) || "modified_api".equals(symbol.status()) ? "high" : "medium";
+            String reason = "modified_api".equals(symbol.status())
+                    ? "Changed public API should be covered by direct contract tests."
+                    : "Changed implementation should be covered by direct regression tests.";
+            suggestionsBySymbolKey.put(symbol.symbolKey(), new TestFocusSuggestion(symbol, priority, reason));
+        }
+
+        for (PropagationPath path : propagationPaths) {
+            ChangeSetReviewSymbol target = path.toSymbol();
+            String reason = "Downstream symbol is connected by " + path.relationType().name().toLowerCase(Locale.ROOT) + " and should receive integration-focused checks.";
+            suggestionsBySymbolKey.putIfAbsent(target.symbolKey(), new TestFocusSuggestion(target, "medium", reason));
+        }
+
+        for (ChangeSetReviewSymbol symbol : impactedSymbols) {
+            suggestionsBySymbolKey.putIfAbsent(
+                    symbol.symbolKey(),
+                    new TestFocusSuggestion(symbol, "medium", "Impacted symbol should be covered by downstream smoke or integration tests.")
+            );
+        }
+
+        return suggestionsBySymbolKey.values().stream()
+                .sorted((left, right) -> Integer.compare(testFocusPriority(right.priority()), testFocusPriority(left.priority())))
+                .limit(5)
+                .toList();
+    }
+
+    private int testFocusPriority(String priority) {
+        return switch (priority) {
+            case "high" -> 3;
+            case "medium" -> 2;
+            case "low" -> 1;
+            default -> 0;
+        };
+    }
+
     private void appendSymbolSection(StringBuilder markdown, String title, List<ChangeSetReviewSymbol> symbols) {
         markdown.append("## ").append(title).append("\n\n");
         if (symbols.isEmpty()) {
@@ -423,6 +484,7 @@ public class ChangeSetReviewService {
             List<ChangeSetReviewSymbol> impactedSymbols,
             List<ChangeSetReviewSymbol> reviewTargets,
             List<PropagationPath> propagationPaths,
+            List<TestFocusSuggestion> testFocusSuggestions,
             ChangeSetRiskSummary risk,
             String summary
     ) {
@@ -447,6 +509,13 @@ public class ChangeSetReviewService {
             RelationType relationType,
             String filePath,
             Integer sourceLine
+    ) {
+    }
+
+    public record TestFocusSuggestion(
+            ChangeSetReviewSymbol symbol,
+            String priority,
+            String reason
     ) {
     }
 

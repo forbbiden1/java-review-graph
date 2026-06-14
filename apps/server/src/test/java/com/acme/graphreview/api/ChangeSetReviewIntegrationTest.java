@@ -62,6 +62,8 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.propagationPaths[0].fromSymbol.symbolKey").value("type:demo.Service"))
                 .andExpect(jsonPath("$.propagationPaths[0].toSymbol.symbolKey").value("type:demo.Controller"))
                 .andExpect(jsonPath("$.propagationPaths[0].relationType").value("uses_type"))
+                .andExpect(jsonPath("$.testFocusSuggestions[0].symbol.symbolKey").value("type:demo.Service"))
+                .andExpect(jsonPath("$.testFocusSuggestions[0].priority").value("high"))
                 .andExpect(jsonPath("$.risk.level").value("medium"))
                 .andExpect(jsonPath("$.risk.score").value(4))
                 .andExpect(jsonPath("$.risk.reasons[0]").value("Public API or deleted symbol changed."))
@@ -101,6 +103,8 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("# Change-Set Review Report")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Prioritized Review Targets")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Propagation Paths")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Test Focus Suggestions")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Changed public API should be covered by direct contract tests.")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("`demo.ServiceExport` -> `demo.ControllerExport` via `uses_type`")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }

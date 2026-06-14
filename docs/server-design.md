@@ -87,6 +87,7 @@ Current query-path behavior:
 - change-set review also derives a deterministic risk summary from changed statuses, impacted count, and deleted-symbol signals
 - change-set review can also render one export-ready Markdown report without introducing AI or non-deterministic scoring
 - change-set review also exposes direct propagation paths between changed and impacted symbols from stored graph relations
+- change-set review also derives deterministic test-focus suggestions from changed APIs, impacted symbols, and propagation paths
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction

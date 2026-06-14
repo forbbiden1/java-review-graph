@@ -4,6 +4,7 @@ import {
   type ClassGraph,
   type ChangeSetReviewMarkdownReport,
   type ChangeSetReviewResult,
+  type ChangeSetTestFocusSuggestion,
   type ChangeSetReviewSymbol,
   createProject,
   deleteProject,
@@ -1621,6 +1622,32 @@ function ChangeSetReviewPanel({
                     {path.sourceLine ? `:${path.sourceLine}` : ""}
                   </p>
                 ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>Test Focus Suggestions</strong>
+          <span>{result.testFocusSuggestions.length}</span>
+        </div>
+        {result.testFocusSuggestions.length === 0 ? (
+          <p className="diagnostic-path-empty">None</p>
+        ) : (
+          <div className="list-stack">
+            {result.testFocusSuggestions.map((suggestion) => (
+              <article
+                key={`${suggestion.symbol.symbolKey}:${suggestion.priority}`}
+                className={`change-card status-${suggestion.symbol.status}`}
+              >
+                <div className="change-head">
+                  <span className={`status-pill status-${suggestion.symbol.status}`}>{suggestion.priority}</span>
+                  <code>{compactSymbolKey(suggestion.symbol.symbolKey)}</code>
+                </div>
+                <strong>{suggestion.symbol.displayName}</strong>
+                <p>{suggestion.reason}</p>
               </article>
             ))}
           </div>

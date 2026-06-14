@@ -103,6 +103,12 @@ export type ChangeSetPropagationPath = {
   sourceLine: number | null;
 };
 
+export type ChangeSetTestFocusSuggestion = {
+  symbol: ChangeSetReviewSymbol;
+  priority: string;
+  reason: string;
+};
+
 export type ChangeSetReviewResult = {
   projectId: string;
   snapshotId: string;
@@ -115,6 +121,7 @@ export type ChangeSetReviewResult = {
   impactedSymbols: ChangeSetReviewSymbol[];
   reviewTargets: ChangeSetReviewSymbol[];
   propagationPaths: ChangeSetPropagationPath[];
+  testFocusSuggestions: ChangeSetTestFocusSuggestion[];
   risk: ChangeSetReviewRisk;
   summary: string;
 };

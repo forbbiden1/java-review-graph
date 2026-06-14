@@ -9,6 +9,7 @@ import com.acme.graphreview.application.ChangeSetReviewService;
 import com.acme.graphreview.application.GraphOrderingService;
 import com.acme.graphreview.application.GraphOrderingService.GraphNodeLayout;
 import com.acme.graphreview.application.ReviewQueryService;
+import com.acme.graphreview.application.SnapshotCompareService;
 import com.acme.model.graph.RelationRecord;
 import com.acme.model.graph.SymbolRecord;
 import jakarta.validation.Valid;
@@ -35,19 +36,22 @@ public class ProjectController {
     private final ChangeSetReviewService changeSetReviewService;
     private final ReviewQueryService reviewQueryService;
     private final GraphOrderingService graphOrderingService;
+    private final SnapshotCompareService snapshotCompareService;
 
     public ProjectController(
             ProjectService projectService,
             ProjectIndexService projectIndexService,
             ChangeSetReviewService changeSetReviewService,
             ReviewQueryService reviewQueryService,
-            GraphOrderingService graphOrderingService
+            GraphOrderingService graphOrderingService,
+            SnapshotCompareService snapshotCompareService
     ) {
         this.projectService = projectService;
         this.projectIndexService = projectIndexService;
         this.changeSetReviewService = changeSetReviewService;
         this.reviewQueryService = reviewQueryService;
         this.graphOrderingService = graphOrderingService;
+        this.snapshotCompareService = snapshotCompareService;
     }
 
     @PostMapping
@@ -135,6 +139,19 @@ public class ProjectController {
         return ProjectSnapshotDiagnosticsResponse.from(
                 projectIndexService.getSnapshotDiagnostics(projectId, snapshotId)
         );
+    }
+
+    @GetMapping("/{projectId}/snapshots/compare")
+    public SnapshotCompareResponse compareSnapshots(
+            @PathVariable("projectId") String projectId,
+            @RequestParam("baseSnapshotId") String baseSnapshotId,
+            @RequestParam("targetSnapshotId") String targetSnapshotId
+    ) {
+        return SnapshotCompareResponse.from(snapshotCompareService.compareSnapshots(
+                projectId,
+                baseSnapshotId,
+                targetSnapshotId
+        ));
     }
 
     @PatchMapping("/{projectId}/snapshots/{snapshotId}")

@@ -36,7 +36,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 ## P1: Frontend Refactor
 
-- [ ] Split `App.tsx` by feature areas.
+- [x] Split `App.tsx` by feature areas.
   Suggested split: project workspace, snapshot panel, change panel, graph workspace, and settings.
 - [ ] Split `GraphCanvas.tsx` by responsibility.
   Suggested split: layout, viewport state, node interaction, edge rendering, and persisted scene state.
@@ -64,8 +64,10 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when the UI can show dependency or call paths between review-relevant symbols.
 - [ ] Add Markdown review report export.
   Done when one analysis run can be exported as a shareable review summary.
-- [ ] Add historical snapshot comparison.
-  Done when two snapshots can show symbol and relation evolution side by side.
+- [x] Add historical snapshot comparison.
+  Done for symbol-level evolution when two snapshots can show added, deleted, API-modified, and implementation-modified symbols side by side.
+- [ ] Add relation evolution to historical snapshot comparison.
+  Done when dependency and call relation additions, deletions, and changes can be inspected alongside symbol changes.
 - [ ] Add AI-assisted review explanation.
   Done when graph-derived evidence can be summarized into readable review notes and test suggestions.
 

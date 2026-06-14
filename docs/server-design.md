@@ -38,6 +38,8 @@ Current application-layer split:
   snapshot-aware graph query assembly with targeted relation reads for class and method views
 - `ChangeSetReviewService`
   review-oriented change-set summary assembly based on one snapshot and one Git or manual file set
+- `SnapshotCompareService`
+  deterministic symbol-level diff summary between two persisted snapshots
 
 ## Main Use Cases
 
@@ -88,6 +90,7 @@ Current query-path behavior:
 - change-set review can also render one export-ready Markdown report without introducing AI or non-deterministic scoring
 - change-set review also exposes direct propagation paths between changed and impacted symbols from stored graph relations
 - change-set review also derives deterministic test-focus suggestions from changed APIs, impacted symbols, and propagation paths
+- snapshot compare reads two persisted symbol sets by snapshot id and reports added, deleted, API-modified, and implementation-modified symbols without invoking AI or recomputing source analysis
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction

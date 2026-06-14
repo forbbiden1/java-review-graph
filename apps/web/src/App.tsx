@@ -1,9 +1,11 @@
 import { type FormEvent, type MouseEvent as ReactMouseEvent, useEffect, useState } from "react";
 import {
+  compareSnapshots,
   exportChangeSetReviewMarkdown,
   type ClassGraph,
   type ChangeSetReviewMarkdownReport,
   type ChangeSetReviewResult,
+  type SnapshotCompareResult,
   createProject,
   deleteProject,
   deleteSnapshot,
@@ -33,6 +35,7 @@ import {
   MetricBadge,
   Panel,
   SelectionCard,
+  SnapshotComparePanel,
   SnapshotDiagnosticsPanel
 } from "./app/components";
 import {
@@ -99,9 +102,12 @@ function App() {
   const [changedFilesText, setChangedFilesText] = useState("");
   const [reviewResult, setReviewResult] = useState<ChangeSetReviewResult | null>(null);
   const [reviewMarkdownReport, setReviewMarkdownReport] = useState<ChangeSetReviewMarkdownReport | null>(null);
+  const [snapshotCompareBaseId, setSnapshotCompareBaseId] = useState("");
+  const [snapshotCompareResult, setSnapshotCompareResult] = useState<SnapshotCompareResult | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
   const [loadingSnapshotDiagnostics, setLoadingSnapshotDiagnostics] = useState(false);
+  const [loadingSnapshotCompare, setLoadingSnapshotCompare] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
   const [submittingIndex, setSubmittingIndex] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -224,6 +230,22 @@ function App() {
     setCollapsedSnapshotGroupKeys((currentKeys) =>
       currentKeys.includes(selectedGroupKey) ? currentKeys.filter((key) => key !== selectedGroupKey) : currentKeys
     );
+  }, [selectedSnapshotId, snapshots]);
+
+  useEffect(() => {
+    if (!selectedSnapshotId) {
+      setSnapshotCompareBaseId("");
+      setSnapshotCompareResult(null);
+      return;
+    }
+
+    const fallbackSnapshot = snapshots.find((snapshot) => snapshot.id !== selectedSnapshotId) ?? null;
+    setSnapshotCompareBaseId((current) =>
+      current && current !== selectedSnapshotId && snapshots.some((snapshot) => snapshot.id === current)
+        ? current
+        : (fallbackSnapshot?.id ?? "")
+    );
+    setSnapshotCompareResult(null);
   }, [selectedSnapshotId, snapshots]);
 
   useEffect(() => {
@@ -522,6 +544,24 @@ function App() {
     }
   }
 
+  async function handleRunSnapshotCompare() {
+    if (!selectedProjectId || !selectedSnapshotId || !snapshotCompareBaseId) {
+      return;
+    }
+
+    setLoadingSnapshotCompare(true);
+    setErrorMessage(null);
+    try {
+      const result = await compareSnapshots(selectedProjectId, snapshotCompareBaseId, selectedSnapshotId);
+      setSnapshotCompareResult(result);
+      setWorkspaceMessage(result.note);
+    } catch (error) {
+      setErrorMessage(toMessage(error, copy.messages.unexpectedError));
+    } finally {
+      setLoadingSnapshotCompare(false);
+    }
+  }
+
   async function handleDeleteProject(projectOverride?: Project) {
     const projectToDelete = projectOverride ?? selectedProject;
     if (!projectToDelete) {
@@ -807,6 +847,7 @@ function App() {
     setChanges([]);
     setReviewResult(null);
     setReviewMarkdownReport(null);
+    setSnapshotCompareResult(null);
     setSelectedClassId(null);
     setSelectedMethodId(null);
     setWorkspaceMessage(null);
@@ -1158,6 +1199,34 @@ function App() {
                     language={settings.language}
                     loading={loadingSnapshotDiagnostics}
                     selectedSnapshot={selectedSnapshot}
+                  />
+                </Panel>
+
+                <Panel
+                  title={settings.language === "zh" ? "快照对比" : "Snapshot Compare"}
+                  subtitle={
+                    settings.language === "zh"
+                      ? "选择一个基线快照，对比当前快照的符号级差异。"
+                      : "Choose a base snapshot and compare symbol-level diffs against the current snapshot."
+                  }
+                >
+                  <SnapshotComparePanel
+                    baseSnapshotId={snapshotCompareBaseId}
+                    compareLabel={settings.language === "zh" ? "基线快照" : "Base Snapshot"}
+                    compareResult={snapshotCompareResult}
+                    emptyBody={
+                      settings.language === "zh"
+                        ? "至少保留两个快照后，才能对比历史与当前结果。"
+                        : "Keep at least two snapshots to compare history against the current result."
+                    }
+                    emptyTitle={settings.language === "zh" ? "暂无可对比快照" : "No comparable snapshots"}
+                    language={settings.language}
+                    loading={loadingSnapshotCompare}
+                    onBaseSnapshotChange={setSnapshotCompareBaseId}
+                    onRunCompare={() => void handleRunSnapshotCompare()}
+                    runLabel={settings.language === "zh" ? "运行对比" : "Run Compare"}
+                    snapshots={snapshots}
+                    targetSnapshot={selectedSnapshot}
                   />
                 </Panel>
 

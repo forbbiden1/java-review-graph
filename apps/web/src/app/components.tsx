@@ -3,6 +3,7 @@ import type {
   ChangeSetReviewMarkdownReport,
   ChangeSetReviewResult,
   ProjectSnapshot,
+  SnapshotCompareResult,
   SnapshotDiagnostics,
   SymbolChange
 } from "../api/client";
@@ -256,6 +257,101 @@ export function SnapshotDiagnosticsPanel({
       <DiagnosticPathSection title={labels.renamedPaths} paths={diagnostics.renamedPaths} emptyLabel={labels.none} />
       <DiagnosticPathSection title={labels.rebuildPaths} paths={diagnostics.rebuildPaths} emptyLabel={labels.none} />
       <DiagnosticPathSection title={labels.removedPaths} paths={diagnostics.removedPaths} emptyLabel={labels.none} />
+    </div>
+  );
+}
+
+type SnapshotComparePanelProps = {
+  baseSnapshotId: string;
+  compareLabel: string;
+  compareResult: SnapshotCompareResult | null;
+  emptyBody: string;
+  emptyTitle: string;
+  language: LanguageMode;
+  loading: boolean;
+  onBaseSnapshotChange: (snapshotId: string) => void;
+  onRunCompare: () => void;
+  runLabel: string;
+  snapshots: ProjectSnapshot[];
+  targetSnapshot: ProjectSnapshot | null;
+};
+
+export function SnapshotComparePanel({
+  baseSnapshotId,
+  compareLabel,
+  compareResult,
+  emptyBody,
+  emptyTitle,
+  language,
+  loading,
+  onBaseSnapshotChange,
+  onRunCompare,
+  runLabel,
+  snapshots,
+  targetSnapshot
+}: SnapshotComparePanelProps) {
+  const baseOptions = snapshots.filter((snapshot) => snapshot.id !== targetSnapshot?.id);
+
+  if (!targetSnapshot || snapshots.length < 2) {
+    return <EmptyState title={emptyTitle} body={emptyBody} />;
+  }
+
+  return (
+    <div className="snapshot-compare-shell">
+      <div className="snapshot-compare-controls">
+        <label className="field">
+          <span>{compareLabel}</span>
+          <select value={baseSnapshotId} onChange={(event) => onBaseSnapshotChange(event.target.value)}>
+            <option value="">{language === "zh" ? "选择基线快照" : "Choose base snapshot"}</option>
+            {baseOptions.map((snapshot) => (
+              <option key={snapshot.id} value={snapshot.id}>
+                {snapshot.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="secondary-button" disabled={loading || !baseSnapshotId} onClick={onRunCompare}>
+          {loading ? (language === "zh" ? "对比中..." : "Comparing...") : runLabel}
+        </button>
+      </div>
+
+      {compareResult ? (
+        <>
+          <div className="snapshot-compare-summary">
+            <DiagnosticFact label="Added" value={String(compareResult.summary.added)} />
+            <DiagnosticFact label="Deleted" value={String(compareResult.summary.deleted)} />
+            <DiagnosticFact label="API" value={String(compareResult.summary.modifiedApi)} />
+            <DiagnosticFact label="Impl" value={String(compareResult.summary.modifiedImpl)} />
+          </div>
+          <article className="selection-card status-impacted">
+            <div className="selection-head">
+              <span className="status-pill status-impacted">{compareResult.summary.changed}</span>
+              <span className="selection-kind">
+                {compareResult.baseSnapshot.displayName} -&gt; {compareResult.targetSnapshot.displayName}
+              </span>
+            </div>
+            <h3>{language === "zh" ? "快照差异摘要" : "Snapshot Diff Summary"}</h3>
+            <p>{compareResult.note}</p>
+          </article>
+          <div className="list-stack">
+            {compareResult.changes.slice(0, 8).map((change) => (
+              <article key={`${change.changeType}:${change.symbolKey}`} className={`change-card status-${change.changeType}`}>
+                <div className="change-head">
+                  <span className={`status-pill status-${change.changeType}`}>{formatStatusLabel(change.changeType, language)}</span>
+                  <code>{compactSymbolKey(change.symbolKey)}</code>
+                </div>
+                <strong>{change.displayName}</strong>
+                <p>{change.qualifiedName}</p>
+                {change.filePath ? (
+                  <p className="review-path-meta">
+                    <code>{change.filePath}</code>
+                  </p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

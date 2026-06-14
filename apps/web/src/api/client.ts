@@ -131,6 +131,45 @@ export type ChangeSetReviewMarkdownReport = {
   markdown: string;
 };
 
+export type SnapshotCompareRef = {
+  id: string;
+  displayName: string;
+  gitCommit: string | null;
+  gitCommitMessage: string | null;
+};
+
+export type SnapshotCompareSummary = {
+  baseSymbolCount: number;
+  targetSymbolCount: number;
+  totalComparedSymbols: number;
+  added: number;
+  deleted: number;
+  modifiedApi: number;
+  modifiedImpl: number;
+  unchanged: number;
+  changed: number;
+};
+
+export type SnapshotCompareChange = {
+  symbolKey: string;
+  qualifiedName: string;
+  displayName: string;
+  kind: string;
+  symbolType: string;
+  filePath: string | null;
+  changeType: string;
+  reason: string;
+};
+
+export type SnapshotCompareResult = {
+  projectId: string;
+  baseSnapshot: SnapshotCompareRef;
+  targetSnapshot: SnapshotCompareRef;
+  summary: SnapshotCompareSummary;
+  changes: SnapshotCompareChange[];
+  note: string;
+};
+
 export type ProjectIndexResult = {
   project: Project;
   snapshot: ProjectSnapshot;
@@ -214,6 +253,16 @@ export function listSnapshots(projectId: string) {
 export function getSnapshotDiagnostics(projectId: string, snapshotId: string) {
   return request<SnapshotDiagnostics>(
     `/api/projects/${encodeURIComponent(projectId)}/snapshots/${encodeURIComponent(snapshotId)}/diagnostics`
+  );
+}
+
+export function compareSnapshots(projectId: string, baseSnapshotId: string, targetSnapshotId: string) {
+  const params = new URLSearchParams({
+    baseSnapshotId,
+    targetSnapshotId
+  });
+  return request<SnapshotCompareResult>(
+    `/api/projects/${encodeURIComponent(projectId)}/snapshots/compare?${params.toString()}`
   );
 }
 

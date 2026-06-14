@@ -48,5 +48,6 @@
 ## Milestone 7
 
 - export review reports in Markdown-first form
-- compare historical snapshots and relation evolution
+- compare historical snapshots at symbol level
+- compare relation evolution across snapshots
 - add AI-assisted review explanations on top of graph evidence

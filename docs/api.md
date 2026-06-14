@@ -129,6 +129,18 @@ Current behavior:
 - includes `changedFiles`, `renamedPaths`, `rebuildPaths`, and `removedPaths`
 - includes `note`, `fallbackReason`, and `includesWorkspaceChanges`
 
+### Compare two snapshots
+
+`GET /api/projects/{projectId}/snapshots/compare?baseSnapshotId={baseSnapshotId}&targetSnapshotId={targetSnapshotId}`
+
+Current behavior:
+
+- requires explicit `baseSnapshotId` and `targetSnapshotId`
+- rejects requests that compare the same snapshot id on both sides
+- loads persisted symbol rows from both snapshots and compares them by `symbolKey`
+- reports `added`, `deleted`, `modified_api`, and `modified_impl` deterministically from symbol existence plus `apiHash` / `implHash`
+- returns a summary count block and a per-symbol diff list for UI inspection
+
 ### Rename one snapshot
 
 `PATCH /api/projects/{projectId}/snapshots/{snapshotId}`

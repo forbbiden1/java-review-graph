@@ -70,6 +70,7 @@
 - 图谱渲染器现在采用懒加载，主入口包更小，图谱 chunk 会在需要时再加载
 - ELK 布局代码现在会作为独立 worker 资源输出，交互层图谱 chunk 体积进一步下降
 - React Flow 及相关图交互依赖会拆到独立的 `graph-flow` vendor chunk，启动代码与画布交互代码保持分离
+- `GraphCanvas.tsx` 现在专注于画布编排；图谱模型类型、ELK 布局、视口计算、场景辅助函数、节点和边渲染器都拆到独立的 `src/graph/*` 模块
 - 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`
 - 当前 UI 已接入现有后端接口和 SQLite 快照数据
 - 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告

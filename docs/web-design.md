@@ -76,6 +76,7 @@ Current implementation notes:
 - the graph renderer is now lazy-loaded so the main application chunk stays small while the graph chunk loads on demand
 - ELK layout code now ships as a separate worker asset, which keeps the interactive graph chunk much smaller
 - React Flow and related graph interaction dependencies are split into a dedicated `graph-flow` vendor chunk, so startup code stays separate from canvas interaction code
+- `GraphCanvas.tsx` now focuses on canvas orchestration; graph model types, ELK layout, viewport math, scene helpers, and node or edge renderers live in separate `src/graph/*` modules
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing

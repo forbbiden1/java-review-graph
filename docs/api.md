@@ -224,3 +224,15 @@ Current behavior:
 - maps changed file paths to changed symbols in the selected snapshot
 - reads persisted symbol-change rows to surface impacted or deleted symbols for review
 - returns a compact summary including changed files, rename pairs, changed symbols, impacted symbols, prioritized review targets, a deterministic risk level, and one summary sentence
+
+### Export change-set review Markdown
+
+`POST /api/projects/{projectId}/review/change-set/markdown`
+
+Request body is the same as `POST /api/projects/{projectId}/review/change-set`.
+
+Current behavior:
+
+- runs the same deterministic change-set review flow against one selected snapshot
+- returns an export-ready Markdown body plus a suggested file name
+- includes scope, summary, deterministic risk reasons, changed files, renamed paths, prioritized review targets, changed symbols, and impacted symbols

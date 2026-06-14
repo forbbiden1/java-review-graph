@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand;
+import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewMarkdownReport;
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewResult;
 import com.acme.graphreview.domain.ProjectSnapshot;
 import com.acme.graphreview.domain.RegisteredProject;
@@ -83,6 +84,60 @@ class ChangeSetReviewServiceTest {
         assertTrue(result.risk().reasons().contains("One-hop impacted symbols were found."));
         assertEquals(changedType.symbolKey(), result.reviewTargets().get(0).symbolKey());
         assertTrue(result.summary().contains("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s). Risk level: medium."));
+    }
+
+    @Test
+    void exportsMarkdownReportForChangeSetReview() {
+        RegisteredProject project = new RegisteredProject(
+                "project-1",
+                "demo",
+                Path.of(".").toAbsolutePath().normalize().toString(),
+                "maven",
+                Instant.now(),
+                Instant.now()
+        );
+        ProjectSnapshot snapshot = new ProjectSnapshot(
+                "snapshot-1",
+                project.id(),
+                null,
+                "git",
+                "abcdef123456",
+                "Review baseline",
+                "Review Baseline",
+                "completed",
+                Instant.now()
+        );
+
+        SymbolRecord changedType = symbol("type:demo.Service", "demo.Service", "Service", "src/main/java/demo/Service.java", ChangeStatus.MODIFIED_API);
+        SymbolRecord impactedType = symbol("type:demo.Controller", "demo.Controller", "Controller", "src/main/java/demo/Controller.java", ChangeStatus.IMPACTED);
+
+        ChangeSetReviewService service = new ChangeSetReviewService(
+                new StubProjectService(project),
+                new StubSnapshotRepository(snapshot),
+                new StubSourceFileRepository(List.of(
+                        storedFile("src/main/java/demo/Service.java"),
+                        storedFile("src/main/java/demo/Controller.java")
+                )),
+                new StubSymbolRepository(List.of(changedType, impactedType)),
+                new StubSymbolChangeRepository(List.of(
+                        new StoredSymbolChange("change-1", project.id(), snapshot.id(), impactedType.symbolKey(), null, impactedType.symbolKey(), "impacted", "one-hop")
+                )),
+                new StubGitSnapshotMetadataResolver(GitChangedFiles.available(
+                        List.of("src/main/java/demo/Service.java"),
+                        "Incremental Git diff collected 1 changed path(s) from commit abcdef12 to the current workspace state."
+                ))
+        );
+
+        ChangeSetReviewMarkdownReport report = service.exportMarkdownReport(
+                project.id(),
+                new ChangeSetReviewCommand(snapshot.id(), "git", List.of())
+        );
+
+        assertEquals("change-set-review-project-1-review-baseline-git.md", report.fileName());
+        assertTrue(report.markdown().contains("# Change-Set Review Report"));
+        assertTrue(report.markdown().contains("## Risk"));
+        assertTrue(report.markdown().contains("`demo.Service` (`class`, `modified_api`, `changed`)"));
+        assertTrue(report.markdown().contains("Public API or deleted symbol changed."));
     }
 
     private static SymbolRecord symbol(

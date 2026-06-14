@@ -75,3 +75,4 @@ Current implementation notes:
 - class graph and method graph share the same renderer and scene persistence logic
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
+- the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing

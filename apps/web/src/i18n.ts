@@ -21,6 +21,8 @@ export type AppCopy = {
     indexControlTitle: string;
     methodGraphTitle: string;
     projectsTitle: string;
+    reviewExportSubtitle: string;
+    reviewExportTitle: string;
     reviewNotesSubtitle: string;
     reviewNotesTitle: string;
     selectionSubtitle: string;
@@ -30,9 +32,11 @@ export type AppCopy = {
   };
   states: {
     deletingProject: string;
+    exportingMarkdown: string;
     importing: string;
     indexing: string;
     loadingProjects: string;
+    reviewing: string;
   };
   buttons: {
     back: string;
@@ -45,6 +49,8 @@ export type AppCopy = {
     incremental: string;
     full: string;
     manual: string;
+    exportMarkdown: string;
+    runReview: string;
     runIndex: string;
     saveSettings: string;
     useDefault: string;
@@ -55,6 +61,7 @@ export type AppCopy = {
     incrementalSource: string;
     language: string;
     name: string;
+    reviewSource: string;
     rootPath: string;
     runtime: string;
   };
@@ -90,17 +97,25 @@ export type AppCopy = {
     methodGraphEmptyTitle: string;
     projectsEmptyBody: string;
     projectsEmptyTitle: string;
+    reviewExportEmptyBody: string;
+    reviewExportEmptyTitle: string;
+    reviewMarkdownLabel: string;
+    reviewTargetsLabel: string;
     settingsSubtitle: string;
   };
   messages: {
     classExpanded: (name: string, count: number) => string;
     confirmDeleteProject: (name: string) => string;
     indexFinished: (name: string, typeCount: number, methodCount: number, relationCount: number) => string;
+    markdownExported: (fileName: string) => string;
     projectDeleted: (name: string) => string;
     projectReady: (name: string) => string;
+    reviewFinished: (riskLevel: string, targetCount: number) => string;
     settingsSaved: string;
     snapshotLoaded: (snapshotId: string, classCount: number, relationCount: number, changeCount: number) => string;
     selectProjectBeforeIndex: string;
+    selectProjectBeforeReview: string;
+    selectSnapshotBeforeReview: string;
     unsupportedProjectLanguage: string;
     unexpectedError: string;
   };
@@ -153,6 +168,8 @@ const EN_COPY: AppCopy = {
     indexControlTitle: "Index Control",
     methodGraphTitle: "Method Graph",
     projectsTitle: "Projects",
+    reviewExportSubtitle: "Run change-set review on the selected snapshot and export a Markdown summary.",
+    reviewExportTitle: "Change-Set Review",
     reviewNotesSubtitle: "Current scope and implementation limits.",
     reviewNotesTitle: "Review Notes",
     selectionSubtitle: "Current class or method focus.",
@@ -162,9 +179,11 @@ const EN_COPY: AppCopy = {
   },
   states: {
     deletingProject: "Deleting...",
+    exportingMarkdown: "Exporting...",
     importing: "Importing...",
     indexing: "Indexing...",
-    loadingProjects: "Loading imported projects..."
+    loadingProjects: "Loading imported projects...",
+    reviewing: "Reviewing..."
   },
   buttons: {
     back: "Back",
@@ -177,6 +196,8 @@ const EN_COPY: AppCopy = {
     incremental: "Incremental",
     full: "Full",
     manual: "Manual",
+    exportMarkdown: "Export Markdown",
+    runReview: "Run Review",
     runIndex: "Run Index",
     saveSettings: "Save Settings",
     useDefault: "Use Default"
@@ -187,6 +208,7 @@ const EN_COPY: AppCopy = {
     incrementalSource: "Change Source",
     language: "Language",
     name: "Name",
+    reviewSource: "Review Source",
     rootPath: "Root Path",
     runtime: "Runtime"
   },
@@ -228,6 +250,10 @@ const EN_COPY: AppCopy = {
     methodGraphEmptyTitle: "No method graph loaded",
     projectsEmptyBody: "Import a local Java repository to create the first review workspace.",
     projectsEmptyTitle: "No projects yet",
+    reviewExportEmptyBody: "Run a change-set review to inspect risk, targets, and export-ready Markdown.",
+    reviewExportEmptyTitle: "No review report yet",
+    reviewMarkdownLabel: "Markdown Preview",
+    reviewTargetsLabel: "Priority Targets",
     settingsSubtitle: "Desktop preferences and language controls."
   },
   messages: {
@@ -235,12 +261,16 @@ const EN_COPY: AppCopy = {
     confirmDeleteProject: (name) => `Delete project ${name}? This removes its snapshots and stored review data.`,
     indexFinished: (name, typeCount, methodCount, relationCount) =>
       `Index finished for ${name}: ${typeCount} classes, ${methodCount} methods, ${relationCount} relations.`,
+    markdownExported: (fileName) => `Markdown report ready: ${fileName}.`,
     projectDeleted: (name) => `Deleted project ${name}.`,
     projectReady: (name) => `Project ${name} is ready. Run an index to populate the first snapshot.`,
+    reviewFinished: (riskLevel, targetCount) => `Change-set review finished with ${riskLevel} risk and ${targetCount} priority target(s).`,
     settingsSaved: "Settings saved.",
     snapshotLoaded: (snapshotId, classCount, relationCount, changeCount) =>
       `Loaded snapshot ${snapshotId} with ${classCount} classes, ${relationCount} class relations, and ${changeCount} change records.`,
     selectProjectBeforeIndex: "Select a project before starting an index run.",
+    selectProjectBeforeReview: "Select a project before running change-set review.",
+    selectSnapshotBeforeReview: "Select a snapshot before running change-set review.",
     unsupportedProjectLanguage: "Unsupported project language. Only Java projects can be imported.",
     unexpectedError: "Unexpected error."
   },
@@ -419,11 +449,26 @@ const ZH_COPY = {
 ZH_COPY.messages.unsupportedProjectLanguage = "暂不支持导入该语言项目，目前只支持 Java 项目。";
 
 ZH_COPY.states.deletingProject = "删除中...";
+ZH_COPY.states.exportingMarkdown = "导出中...";
+ZH_COPY.states.reviewing = "分析中...";
 ZH_COPY.buttons.back = "返回";
 ZH_COPY.buttons.deleteProject = "删除项目";
 ZH_COPY.buttons.expand = "展开";
+ZH_COPY.buttons.exportMarkdown = "导出 Markdown";
+ZH_COPY.buttons.runReview = "执行 Review";
+ZH_COPY.fields.reviewSource = "Review 来源";
+ZH_COPY.panels.reviewExportTitle = "Change-Set Review";
+ZH_COPY.panels.reviewExportSubtitle = "基于当前快照执行 change-set review，并导出 Markdown 报告。";
+ZH_COPY.copy.reviewExportEmptyTitle = "还没有报告";
+ZH_COPY.copy.reviewExportEmptyBody = "执行一次 change-set review，这里会显示风险、优先目标和 Markdown 预览。";
+ZH_COPY.copy.reviewMarkdownLabel = "Markdown 预览";
+ZH_COPY.copy.reviewTargetsLabel = "优先 Review 目标";
 ZH_COPY.messages.confirmDeleteProject = (name) => `确认删除项目 ${name}？该项目的快照和已保存评审数据会一起删除。`;
+ZH_COPY.messages.markdownExported = (fileName) => `Markdown 报告已准备完成：${fileName}。`;
 ZH_COPY.messages.projectDeleted = (name) => `已删除项目 ${name}。`;
+ZH_COPY.messages.reviewFinished = (riskLevel, targetCount) => `change-set review 已完成，风险等级为 ${riskLevel}，优先目标 ${targetCount} 个。`;
+ZH_COPY.messages.selectProjectBeforeReview = "请先选择一个项目再执行 change-set review。";
+ZH_COPY.messages.selectSnapshotBeforeReview = "请先选择一个快照再执行 change-set review。";
 
 export function getCopy(language: LanguageMode) {
   return language === "zh" ? ZH_COPY : EN_COPY;

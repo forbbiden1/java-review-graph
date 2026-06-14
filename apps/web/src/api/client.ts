@@ -80,6 +80,41 @@ export type SymbolChange = {
   reason: string;
 };
 
+export type ChangeSetReviewSymbol = {
+  symbolKey: string;
+  qualifiedName: string;
+  displayName: string;
+  kind: string;
+  status: string;
+  reviewRole: string;
+};
+
+export type ChangeSetReviewRisk = {
+  level: string;
+  score: number;
+  reasons: string[];
+};
+
+export type ChangeSetReviewResult = {
+  projectId: string;
+  snapshotId: string;
+  snapshotDisplayName: string;
+  note: string;
+  changedFiles: string[];
+  renamedPaths: string[];
+  includesWorkspaceChanges: boolean;
+  changedSymbols: ChangeSetReviewSymbol[];
+  impactedSymbols: ChangeSetReviewSymbol[];
+  reviewTargets: ChangeSetReviewSymbol[];
+  risk: ChangeSetReviewRisk;
+  summary: string;
+};
+
+export type ChangeSetReviewMarkdownReport = {
+  fileName: string;
+  markdown: string;
+};
+
 export type ProjectIndexResult = {
   project: Project;
   snapshot: ProjectSnapshot;
@@ -221,4 +256,24 @@ export function getMethodGraph(projectId: string, classId: string, snapshotId?: 
   const query = params.toString();
   const suffix = query ? `?${query}` : "";
   return request<MethodGraph>(`/api/projects/${encodeURIComponent(projectId)}/method-graph${suffix}`);
+}
+
+export function reviewChangeSet(
+  projectId: string,
+  payload: { snapshotId?: string | null; changeSource?: "git" | "manual"; changedFiles?: string[] }
+) {
+  return request<ChangeSetReviewResult>(`/api/projects/${encodeURIComponent(projectId)}/review/change-set`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function exportChangeSetReviewMarkdown(
+  projectId: string,
+  payload: { snapshotId?: string | null; changeSource?: "git" | "manual"; changedFiles?: string[] }
+) {
+  return request<ChangeSetReviewMarkdownReport>(`/api/projects/${encodeURIComponent(projectId)}/review/change-set/markdown`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }

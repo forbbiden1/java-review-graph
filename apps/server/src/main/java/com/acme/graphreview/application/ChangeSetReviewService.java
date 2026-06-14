@@ -2,21 +2,18 @@ package com.acme.graphreview.application;
 
 import com.acme.graphreview.domain.ProjectSnapshot;
 import com.acme.graphreview.domain.RegisteredProject;
-import com.acme.graphreview.domain.StoredSourceFile;
 import com.acme.graphreview.domain.StoredSymbolChange;
 import com.acme.graphreview.infrastructure.GitChangedFiles;
 import com.acme.graphreview.infrastructure.GitSnapshotMetadataResolver;
 import com.acme.graphreview.infrastructure.ProjectValidationException;
 import com.acme.graphreview.infrastructure.SnapshotNotFoundException;
 import com.acme.model.graph.SymbolRecord;
-import com.acme.model.review.ChangeStatus;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -50,10 +47,6 @@ public class ChangeSetReviewService {
         RegisteredProject project = projectService.getProject(projectId);
         ProjectSnapshot snapshot = resolveSnapshot(project.id(), command.snapshotId());
         GitChangedFiles changedFiles = resolveChangedFiles(project, snapshot, command);
-
-        List<StoredSourceFile> storedFiles = sourceFileRepository.findByProjectIdAndSnapshotId(project.id(), snapshot.id());
-        Map<String, StoredSourceFile> fileByPath = storedFiles.stream()
-                .collect(java.util.stream.Collectors.toMap(StoredSourceFile::path, file -> file, (left, right) -> left, LinkedHashMap::new));
 
         LinkedHashSet<String> normalizedPaths = new LinkedHashSet<>();
         for (String rawPath : changedFiles.paths()) {
@@ -113,6 +106,15 @@ public class ChangeSetReviewService {
                 reviewTargets,
                 riskSummary,
                 summary
+        );
+    }
+
+    public ChangeSetReviewMarkdownReport exportMarkdownReport(String projectId, ChangeSetReviewCommand command) {
+        String changeSource = normalizeChangeSource(command.changeSource());
+        ChangeSetReviewResult result = reviewChangeSet(projectId, command);
+        return new ChangeSetReviewMarkdownReport(
+                buildReportFileName(result, changeSource),
+                buildMarkdownReport(result, changeSource)
         );
     }
 
@@ -247,6 +249,80 @@ public class ChangeSetReviewService {
                 + impactedSymbolCount + " impacted symbol(s). Risk level: " + riskLevel + ".";
     }
 
+    private String buildReportFileName(ChangeSetReviewResult result, String changeSource) {
+        String projectSlug = slugify(result.projectId());
+        String snapshotSlug = slugify(result.snapshotDisplayName());
+        if (snapshotSlug.isBlank()) {
+            snapshotSlug = slugify(result.snapshotId());
+        }
+        return "change-set-review-" + projectSlug + "-" + snapshotSlug + "-" + changeSource + ".md";
+    }
+
+    private String buildMarkdownReport(ChangeSetReviewResult result, String changeSource) {
+        StringBuilder markdown = new StringBuilder();
+        markdown.append("# Change-Set Review Report\n\n");
+        markdown.append("## Scope\n\n");
+        markdown.append("- Project: `").append(result.projectId()).append("`\n");
+        markdown.append("- Snapshot: `").append(result.snapshotDisplayName()).append("` (`").append(result.snapshotId()).append("`)\n");
+        markdown.append("- Change Source: `").append(changeSource).append("`\n");
+        markdown.append("- Includes Workspace Changes: `").append(result.includesWorkspaceChanges()).append("`\n");
+        if (result.note() != null && !result.note().isBlank()) {
+            markdown.append("- Collection Note: ").append(result.note()).append("\n");
+        }
+        markdown.append("\n## Summary\n\n");
+        markdown.append(result.summary()).append("\n\n");
+        markdown.append("## Risk\n\n");
+        markdown.append("- Level: `").append(result.risk().riskLevel()).append("`\n");
+        markdown.append("- Score: `").append(result.risk().riskScore()).append("`\n");
+        markdown.append("- Reasons:\n");
+        for (String reason : result.risk().reasons()) {
+            markdown.append("  - ").append(reason).append("\n");
+        }
+        markdown.append("\n");
+        appendPathSection(markdown, "Changed Files", result.changedFiles());
+        appendPathSection(markdown, "Renamed Paths", result.renamedPaths());
+        appendSymbolSection(markdown, "Prioritized Review Targets", result.reviewTargets());
+        appendSymbolSection(markdown, "Changed Symbols", result.changedSymbols());
+        appendSymbolSection(markdown, "Impacted Symbols", result.impactedSymbols());
+        return markdown.toString();
+    }
+
+    private void appendPathSection(StringBuilder markdown, String title, List<String> paths) {
+        markdown.append("## ").append(title).append("\n\n");
+        if (paths.isEmpty()) {
+            markdown.append("- None\n\n");
+            return;
+        }
+        for (String path : paths) {
+            markdown.append("- `").append(path).append("`\n");
+        }
+        markdown.append("\n");
+    }
+
+    private void appendSymbolSection(StringBuilder markdown, String title, List<ChangeSetReviewSymbol> symbols) {
+        markdown.append("## ").append(title).append("\n\n");
+        if (symbols.isEmpty()) {
+            markdown.append("- None\n\n");
+            return;
+        }
+        for (ChangeSetReviewSymbol symbol : symbols) {
+            markdown.append("- `").append(symbol.qualifiedName()).append("`");
+            markdown.append(" (`").append(symbol.kind()).append("`, `").append(symbol.status()).append("`, `").append(symbol.reviewRole()).append("`)");
+            markdown.append(" - `").append(symbol.symbolKey()).append("`\n");
+        }
+        markdown.append("\n");
+    }
+
+    private String slugify(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-+|-+$)", "");
+    }
+
     public record ChangeSetReviewCommand(
             String snapshotId,
             String changeSource,
@@ -274,6 +350,12 @@ public class ChangeSetReviewService {
             String riskLevel,
             int riskScore,
             List<String> reasons
+    ) {
+    }
+
+    public record ChangeSetReviewMarkdownReport(
+            String fileName,
+            String markdown
     ) {
     }
 

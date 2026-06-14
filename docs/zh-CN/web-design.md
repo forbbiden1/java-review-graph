@@ -74,3 +74,4 @@
 - 图渲染目前是轻量的 SVG 加绝对定位画布，还没有接 Cytoscape
 - 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`
 - 当前 UI 已经接到现有后端接口和 SQLite 快照数据
+- 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告

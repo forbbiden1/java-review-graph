@@ -93,10 +93,24 @@ public class ProjectController {
             @PathVariable("projectId") String projectId,
             @RequestBody(required = false) ChangeSetReviewRequest request
     ) {
-        ChangeSetReviewRequest normalizedRequest = request == null
-                ? new ChangeSetReviewRequest(null, null, List.of())
-                : request;
+        ChangeSetReviewRequest normalizedRequest = normalizeChangeSetReviewRequest(request);
         return ChangeSetReviewResponse.from(changeSetReviewService.reviewChangeSet(
+                projectId,
+                new com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand(
+                        normalizedRequest.snapshotId(),
+                        normalizedRequest.changeSource(),
+                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles()
+                )
+        ));
+    }
+
+    @PostMapping("/{projectId}/review/change-set/markdown")
+    public ChangeSetReviewMarkdownResponse exportChangeSetReviewMarkdown(
+            @PathVariable("projectId") String projectId,
+            @RequestBody(required = false) ChangeSetReviewRequest request
+    ) {
+        ChangeSetReviewRequest normalizedRequest = normalizeChangeSetReviewRequest(request);
+        return ChangeSetReviewMarkdownResponse.from(changeSetReviewService.exportMarkdownReport(
                 projectId,
                 new com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand(
                         normalizedRequest.snapshotId(),
@@ -208,5 +222,11 @@ public class ProjectController {
                         .map(GraphEdgeResponse::from)
                         .toList()
         );
+    }
+
+    private ChangeSetReviewRequest normalizeChangeSetReviewRequest(ChangeSetReviewRequest request) {
+        return request == null
+                ? new ChangeSetReviewRequest(null, null, List.of())
+                : request;
     }
 }

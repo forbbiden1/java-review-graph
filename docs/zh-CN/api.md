@@ -224,3 +224,15 @@
 - 会把变更文件路径映射到所选快照中的变更符号
 - 会读取已持久化的 `symbol_change` 记录，补充 review 所需的受影响符号或删除符号
 - 返回紧凑摘要，包括变更文件、rename 对、变更符号、受影响符号、优先 review 目标、确定性的风险等级以及一段汇总说明
+
+### 导出 change-set review Markdown
+
+`POST /api/projects/{projectId}/review/change-set/markdown`
+
+请求体与 `POST /api/projects/{projectId}/review/change-set` 相同。
+
+当前行为：
+
+- 会基于同一个选定快照执行相同的确定性 change-set review 流程
+- 返回可直接导出的 Markdown 正文以及建议文件名
+- 内容包含 review 范围、摘要、确定性的风险原因、变更文件、rename 路径、优先 review 目标、变更符号和受影响符号

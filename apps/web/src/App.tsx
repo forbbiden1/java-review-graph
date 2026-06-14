@@ -1,6 +1,10 @@
 import { type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useState } from "react";
 import {
+  exportChangeSetReviewMarkdown,
   type ClassGraph,
+  type ChangeSetReviewMarkdownReport,
+  type ChangeSetReviewResult,
+  type ChangeSetReviewSymbol,
   createProject,
   deleteProject,
   deleteSnapshot,
@@ -11,6 +15,7 @@ import {
   listProjects,
   listSnapshots,
   renameSnapshot,
+  reviewChangeSet,
   setApiBaseUrl,
   triggerIndex,
   type GraphNode,
@@ -71,11 +76,15 @@ function App() {
   const [classGraphDisplayMode, setClassGraphDisplayMode] = useState<ClassGraphDisplayMode>("full");
   const [classGraphSearchQuery, setClassGraphSearchQuery] = useState("");
   const [changedFilesText, setChangedFilesText] = useState("");
+  const [reviewResult, setReviewResult] = useState<ChangeSetReviewResult | null>(null);
+  const [reviewMarkdownReport, setReviewMarkdownReport] = useState<ChangeSetReviewMarkdownReport | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
   const [loadingSnapshotDiagnostics, setLoadingSnapshotDiagnostics] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
   const [submittingIndex, setSubmittingIndex] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [exportingReviewMarkdown, setExportingReviewMarkdown] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
   const [renamingSnapshotId, setRenamingSnapshotId] = useState<string | null>(null);
@@ -435,6 +444,62 @@ function App() {
     }
   }
 
+  async function handleRunChangeSetReview() {
+    if (!selectedProjectId) {
+      setErrorMessage(copy.messages.selectProjectBeforeReview);
+      return;
+    }
+    if (!selectedSnapshotId) {
+      setErrorMessage(copy.messages.selectSnapshotBeforeReview);
+      return;
+    }
+
+    setSubmittingReview(true);
+    setErrorMessage(null);
+    try {
+      const result = await reviewChangeSet(selectedProjectId, {
+        snapshotId: selectedSnapshotId,
+        changeSource: indexChangeSource,
+        changedFiles: indexChangeSource === "manual" ? manualChangedFiles : undefined
+      });
+      setReviewResult(result);
+      setReviewMarkdownReport(null);
+      setWorkspaceMessage(copy.messages.reviewFinished(result.risk.level, result.reviewTargets.length));
+    } catch (error) {
+      setErrorMessage(toMessage(error, copy.messages.unexpectedError));
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
+
+  async function handleExportChangeSetReviewMarkdown() {
+    if (!selectedProjectId) {
+      setErrorMessage(copy.messages.selectProjectBeforeReview);
+      return;
+    }
+    if (!selectedSnapshotId) {
+      setErrorMessage(copy.messages.selectSnapshotBeforeReview);
+      return;
+    }
+
+    setExportingReviewMarkdown(true);
+    setErrorMessage(null);
+    try {
+      const report = await exportChangeSetReviewMarkdown(selectedProjectId, {
+        snapshotId: selectedSnapshotId,
+        changeSource: indexChangeSource,
+        changedFiles: indexChangeSource === "manual" ? manualChangedFiles : undefined
+      });
+      setReviewMarkdownReport(report);
+      downloadMarkdownReport(report);
+      setWorkspaceMessage(copy.messages.markdownExported(report.fileName));
+    } catch (error) {
+      setErrorMessage(toMessage(error, copy.messages.unexpectedError));
+    } finally {
+      setExportingReviewMarkdown(false);
+    }
+  }
+
   async function handleDeleteProject(projectOverride?: Project) {
     const projectToDelete = projectOverride ?? selectedProject;
     if (!projectToDelete) {
@@ -718,6 +783,8 @@ function App() {
     setClassGraph(null);
     setMethodGraph(null);
     setChanges([]);
+    setReviewResult(null);
+    setReviewMarkdownReport(null);
     setSelectedClassId(null);
     setSelectedMethodId(null);
     setWorkspaceMessage(null);
@@ -1076,6 +1143,44 @@ function App() {
                   />
                 </Panel>
 
+                <Panel
+                  title={copy.panels.reviewExportTitle}
+                  subtitle={copy.panels.reviewExportSubtitle}
+                  actions={
+                    <div className="panel-header-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void handleRunChangeSetReview()}
+                        disabled={submittingReview || !selectedProjectId || !selectedSnapshotId}
+                      >
+                        {submittingReview ? copy.states.reviewing : copy.buttons.runReview}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void handleExportChangeSetReviewMarkdown()}
+                        disabled={exportingReviewMarkdown || !selectedProjectId || !selectedSnapshotId}
+                      >
+                        {exportingReviewMarkdown ? copy.states.exportingMarkdown : copy.buttons.exportMarkdown}
+                      </button>
+                    </div>
+                  }
+                >
+                  <ChangeSetReviewPanel
+                    changedFiles={indexChangeSource === "manual" ? manualChangedFiles : null}
+                    emptyBody={copy.copy.reviewExportEmptyBody}
+                    emptyTitle={copy.copy.reviewExportEmptyTitle}
+                    language={settings.language}
+                    markdownLabel={copy.copy.reviewMarkdownLabel}
+                    report={reviewMarkdownReport}
+                    result={reviewResult}
+                    reviewTargetsLabel={copy.copy.reviewTargetsLabel}
+                    reviewSourceLabel={copy.fields.reviewSource}
+                    reviewSourceValue={indexChangeSource}
+                  />
+                </Panel>
+
                 <Panel title={copy.panels.reviewNotesTitle} subtitle={copy.panels.reviewNotesSubtitle}>
                   <ul className="review-note-list">
                     {copy.copy.reviewNotes.map((note) => (
@@ -1404,6 +1509,105 @@ function SnapshotDiagnosticsPanel({
   );
 }
 
+type ChangeSetReviewPanelProps = {
+  changedFiles: string[] | null;
+  emptyBody: string;
+  emptyTitle: string;
+  language: LanguageMode;
+  markdownLabel: string;
+  report: ChangeSetReviewMarkdownReport | null;
+  result: ChangeSetReviewResult | null;
+  reviewSourceLabel: string;
+  reviewSourceValue: IndexChangeSource;
+  reviewTargetsLabel: string;
+};
+
+function ChangeSetReviewPanel({
+  changedFiles,
+  emptyBody,
+  emptyTitle,
+  language,
+  markdownLabel,
+  report,
+  result,
+  reviewSourceLabel,
+  reviewSourceValue,
+  reviewTargetsLabel
+}: ChangeSetReviewPanelProps) {
+  if (!result) {
+    return <EmptyState title={emptyTitle} body={emptyBody} />;
+  }
+
+  const riskStatusClass = normalizeRiskStatusClass(result.risk.level);
+
+  return (
+    <div className="review-report-shell">
+      <div className="review-report-meta">
+        <DiagnosticFact label={reviewSourceLabel} value={reviewSourceValue === "manual" ? "manual" : "git"} />
+        <DiagnosticFact label="Risk" value={`${result.risk.level} (${result.risk.score})`} />
+        <DiagnosticFact label="Targets" value={String(result.reviewTargets.length)} />
+        <DiagnosticFact label="Files" value={String(result.changedFiles.length)} />
+      </div>
+
+      <article className={`selection-card ${riskStatusClass}`}>
+        <div className="selection-head">
+          <span className={`status-pill ${riskStatusClass}`}>{result.risk.level}</span>
+          <span className="selection-kind">{result.snapshotDisplayName}</span>
+        </div>
+        <h3>{result.summary}</h3>
+        <p>{result.note}</p>
+      </article>
+
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>{reviewTargetsLabel}</strong>
+          <span>{result.reviewTargets.length}</span>
+        </div>
+        <div className="list-stack">
+          {result.reviewTargets.map((target) => (
+            <article key={`${target.reviewRole}:${target.symbolKey}`} className={`change-card status-${target.status}`}>
+              <div className="change-head">
+                <span className={`status-pill status-${target.status}`}>{formatStatusLabel(target.status, language)}</span>
+                <code>{compactSymbolKey(target.symbolKey)}</code>
+              </div>
+              <strong>{target.displayName}</strong>
+              <p>{target.qualifiedName}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>Reasons</strong>
+          <span>{result.risk.reasons.length}</span>
+        </div>
+        <ul className="review-report-reasons">
+          {result.risk.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      </section>
+
+      <DiagnosticPathSection
+        title={changedFiles ? "Manual Changed Files" : "Changed Files"}
+        paths={result.changedFiles}
+        emptyLabel="None"
+      />
+
+      {report ? (
+        <section className="review-report-section">
+          <div className="diagnostic-path-header">
+            <strong>{markdownLabel}</strong>
+            <span>{report.fileName}</span>
+          </div>
+          <pre className="review-markdown-preview">{report.markdown}</pre>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function DiagnosticFact({ label, value }: { label: string; value: string }) {
   return (
     <article className="diagnostic-fact">
@@ -1625,6 +1829,29 @@ function compactSymbolKey(symbolKey: string) {
   }
   const typeSeparatorIndex = symbolKey.lastIndexOf(":");
   return typeSeparatorIndex >= 0 ? symbolKey.slice(typeSeparatorIndex + 1) : symbolKey;
+}
+
+function normalizeRiskStatusClass(riskLevel: string) {
+  switch (riskLevel.toLowerCase()) {
+    case "high":
+      return "status-modified_api";
+    case "medium":
+      return "status-impacted";
+    default:
+      return "status-added";
+  }
+}
+
+function downloadMarkdownReport(report: ChangeSetReviewMarkdownReport) {
+  const blob = new Blob([report.markdown], { type: "text/markdown;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = report.fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 function groupSymbolChanges(changes: SymbolChange[]) {

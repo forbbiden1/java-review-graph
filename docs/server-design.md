@@ -85,6 +85,7 @@ Current query-path behavior:
 - method graph reads only `CALLS` relations whose source and target both belong to the selected class methods
 - change-set review reads one snapshot plus one Git or manual changed-file set, then maps file paths to changed symbols and persisted impacted symbols
 - change-set review also derives a deterministic risk summary from changed statuses, impacted count, and deleted-symbol signals
+- change-set review can also render one export-ready Markdown report without introducing AI or non-deterministic scoring
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction

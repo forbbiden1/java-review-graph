@@ -64,6 +64,40 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }
 
+    @Test
+    void exportChangeSetReviewMarkdownReturnsMarkdownBody() throws Exception {
+        String projectId = "project-change-set-2";
+        String snapshotId = "snapshot-change-set-2";
+        String changedFileId = "file-change-set-service-2";
+        String impactedFileId = "file-change-set-controller-2";
+        String now = Instant.now().toString();
+
+        insertProject(projectId, now);
+        insertSnapshot(projectId, snapshotId, now);
+        insertSourceFile(projectId, snapshotId, changedFileId, "src/main/java/demo/Service.java", now);
+        insertSourceFile(projectId, snapshotId, impactedFileId, "src/main/java/demo/Controller.java", now);
+        insertSymbol(projectId, snapshotId, changedFileId, "type:demo.ServiceExport", "Service", "demo.ServiceExport", "modified_api", "CLASS");
+        insertSymbol(projectId, snapshotId, impactedFileId, "type:demo.ControllerExport", "Controller", "demo.ControllerExport", "impacted", "CLASS");
+        insertSymbolChange(projectId, snapshotId, "change-impacted-2", "type:demo.ControllerExport", "impacted");
+
+        mockMvc.perform(post("/api/projects/{projectId}/review/change-set/markdown", projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "snapshotId": "snapshot-change-set-2",
+                                  "changeSource": "manual",
+                                  "changedFiles": [
+                                    "src/main/java/demo/Service.java"
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileName").value("change-set-review-project-change-set-2-review-baseline-manual.md"))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("# Change-Set Review Report")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Prioritized Review Targets")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
+    }
+
     private void insertProject(String projectId, String now) {
         jdbcTemplate.update(
                 """

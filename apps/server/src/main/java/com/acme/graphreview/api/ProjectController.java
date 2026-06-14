@@ -5,6 +5,7 @@ import com.acme.graphreview.application.ProjectImportResult;
 import com.acme.graphreview.application.ProjectIndexCommand;
 import com.acme.graphreview.application.ProjectIndexService;
 import com.acme.graphreview.application.ProjectService;
+import com.acme.graphreview.application.ChangeSetReviewService;
 import com.acme.graphreview.application.GraphOrderingService;
 import com.acme.graphreview.application.GraphOrderingService.GraphNodeLayout;
 import com.acme.graphreview.application.ReviewQueryService;
@@ -31,17 +32,20 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectIndexService projectIndexService;
+    private final ChangeSetReviewService changeSetReviewService;
     private final ReviewQueryService reviewQueryService;
     private final GraphOrderingService graphOrderingService;
 
     public ProjectController(
             ProjectService projectService,
             ProjectIndexService projectIndexService,
+            ChangeSetReviewService changeSetReviewService,
             ReviewQueryService reviewQueryService,
             GraphOrderingService graphOrderingService
     ) {
         this.projectService = projectService;
         this.projectIndexService = projectIndexService;
+        this.changeSetReviewService = changeSetReviewService;
         this.reviewQueryService = reviewQueryService;
         this.graphOrderingService = graphOrderingService;
     }
@@ -81,6 +85,24 @@ public class ProjectController {
         return ProjectIndexResponse.from(projectIndexService.indexProject(
                 projectId,
                 new ProjectIndexCommand(request.mode(), request.changeSource(), request.changedFiles())
+        ));
+    }
+
+    @PostMapping("/{projectId}/review/change-set")
+    public ChangeSetReviewResponse reviewChangeSet(
+            @PathVariable("projectId") String projectId,
+            @RequestBody(required = false) ChangeSetReviewRequest request
+    ) {
+        ChangeSetReviewRequest normalizedRequest = request == null
+                ? new ChangeSetReviewRequest(null, null, List.of())
+                : request;
+        return ChangeSetReviewResponse.from(changeSetReviewService.reviewChangeSet(
+                projectId,
+                new com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand(
+                        normalizedRequest.snapshotId(),
+                        normalizedRequest.changeSource(),
+                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles()
+                )
         ));
     }
 

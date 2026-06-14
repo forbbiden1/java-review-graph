@@ -188,3 +188,39 @@
 
 - 返回所选快照中的 `added`、`modified_api`、`modified_impl`、`impacted` 和 `deleted` 记录
 - `impacted` 会基于变更或删除邻居做一跳传播计算
+
+### 分析一个变更集
+
+`POST /api/projects/{projectId}/review/change-set`
+
+请求：
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "manual",
+  "changedFiles": [
+    "src/main/java/demo/Service.java"
+  ]
+}
+```
+
+或者：
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "git"
+}
+```
+
+当前行为：
+
+- 未传 `snapshotId` 时，默认解析到最新快照
+- 支持 `changeSource = git` 或 `manual`
+- 未显式传入时，`changeSource` 默认按 `git` 处理
+- 只有 `manual` 方式才要求提供 `changedFiles`
+- 当 `changeSource = git` 时，会复用快照对应的 Git 基线自动收集变更路径
+- 会把变更文件路径映射到所选快照中的变更符号
+- 会读取已持久化的 `symbol_change` 记录，补充 review 所需的受影响符号或删除符号
+- 返回紧凑摘要，包括变更文件、rename 对、变更符号、受影响符号以及一段汇总说明

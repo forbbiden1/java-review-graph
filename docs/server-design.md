@@ -36,6 +36,8 @@ Current application-layer split:
   symbol diff status and impacted-symbol derivation
 - `ReviewQueryService`
   snapshot-aware graph query assembly with targeted relation reads for class and method views
+- `ChangeSetReviewService`
+  review-oriented change-set summary assembly based on one snapshot and one Git or manual file set
 
 ## Main Use Cases
 
@@ -75,11 +77,13 @@ The first implemented server flow should cover:
 - method graph for one class
 - changed symbol list
 - impact scope
+- change-set review summary
 
 Current query-path behavior:
 
 - class graph reads only `EXTENDS`, `IMPLEMENTS`, and `USES_TYPE` relations for the selected snapshot, then trims to indexed type-to-type edges
 - method graph reads only `CALLS` relations whose source and target both belong to the selected class methods
+- change-set review reads one snapshot plus one Git or manual changed-file set, then maps file paths to changed symbols and persisted impacted symbols
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction

@@ -188,3 +188,39 @@ Current behavior:
 
 - returns persisted `added`, `modified_api`, `modified_impl`, `impacted`, and `deleted` entries for the selected snapshot
 - `impacted` is derived with one-hop propagation from changed or deleted neighbors
+
+### Review one change set
+
+`POST /api/projects/{projectId}/review/change-set`
+
+Request:
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "manual",
+  "changedFiles": [
+    "src/main/java/demo/Service.java"
+  ]
+}
+```
+
+or:
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "git"
+}
+```
+
+Current behavior:
+
+- resolves `snapshotId` to the latest snapshot when omitted
+- supports `changeSource = git` or `manual`
+- defaults `changeSource` to `git` when omitted
+- requires `changedFiles` only for `manual` review requests
+- when `changeSource = git`, reuses the snapshot Git base to collect changed paths from Git
+- maps changed file paths to changed symbols in the selected snapshot
+- reads persisted symbol-change rows to surface impacted or deleted symbols for review
+- returns a compact summary including changed files, rename pairs, changed symbols, impacted symbols, and one summary sentence

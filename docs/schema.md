@@ -13,6 +13,14 @@ The current storage engine is SQLite.
 The runtime schema is initialized from `apps/server/src/main/resources/db/sqlite/schema.sql`.
 The `docs/schema.sql` file remains the human-readable schema reference and should stay aligned with the runtime SQLite schema.
 
+Current query-oriented indexes cover:
+
+- snapshots by project and newest-first ordering
+- snapshots by project and base snapshot linkage
+- source files by project, snapshot, and path
+- symbols by project, snapshot, type, key, and parent symbol
+- relations by project, snapshot, relation type, and source or target symbol keys
+
 ## Core Tables
 
 ### `project`
@@ -100,6 +108,17 @@ The `docs/schema.sql` file remains the human-readable schema reference and shoul
 - `after_symbol_id`
 - `change_type`
 - `reason`
+
+## Current Query Index Direction
+
+- `snapshot(project_id, created_at desc)` supports latest-snapshot lookup and snapshot list views
+- `snapshot(project_id, base_snapshot_id)` supports incremental lineage maintenance when deleting a snapshot
+- `source_file(project_id, snapshot_id, path)` supports incremental snapshot merge and file reuse lookups
+- `symbol(project_id, snapshot_id, symbol_type)` supports class-node queries
+- `symbol(project_id, snapshot_id, parent_symbol_key)` supports method-node queries for one class
+- `symbol(project_id, snapshot_id, symbol_key)` supports stable symbol-key lookup within a snapshot
+- `relation(project_id, snapshot_id, relation_type)` supports class-graph relation slices
+- `relation(project_id, snapshot_id, relation_type, source_symbol_key, target_symbol_key)` supports method-call subgraph reads constrained to one class
 
 ## Symbol Key Rules
 

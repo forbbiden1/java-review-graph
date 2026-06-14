@@ -56,8 +56,8 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 ## P2: SQLite and Persistence
 
-- [ ] Review and add database indexes for high-frequency queries.
-  Focus on snapshots, symbols by snapshot, relations by snapshot, and graph-state persistence.
+- [x] Review and add database indexes for high-frequency queries.
+  Done for current snapshot, source-file, symbol, and relation read paths used by graph queries and incremental snapshot maintenance.
 - [ ] Enable or validate WAL mode and batched writes.
   Done when indexing throughput and UI read concurrency are stable on larger projects.
 - [ ] Add snapshot retention and cleanup tools.

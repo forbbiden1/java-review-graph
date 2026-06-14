@@ -4,6 +4,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type ReactNode,
+  useReducer,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -30,9 +31,7 @@ import {
   type FlowEdge,
   type FlowNode,
   type FlowNodeData,
-  type GraphScopeMode,
   type LayoutResult,
-  type NodeOverrideMap,
   SAFE_MIN_ZOOM,
   type StagePoint,
   type StageSize,
@@ -40,12 +39,11 @@ import {
   ZOOM_SLIDER_MIN
 } from "./graph-model";
 import { edgeTypes, nodeTypes } from "./graph-renderers";
-import { filterNodeOverrides, hasEqualNodeOverrides } from "./graph-scene";
+import { createGraphViewState, createGraphViewStateFromScene, graphViewReducer } from "./graph-state";
 import {
   measureViewportCenter,
   resolveCenteredNodeViewport,
   resolveInitialViewport,
-  sanitizeStoredViewport,
   sanitizeZoom,
   sliderValueToZoom,
   updateStagePointer,
@@ -123,7 +121,6 @@ function GraphCanvasInner({
   const initializedSceneKeyRef = useRef<string | null>(null);
   const previousScopeSignatureRef = useRef<string | null>(null);
   const persistenceTimerRef = useRef<number | null>(null);
-  const nodeOverridesRef = useRef<NodeOverrideMap>({});
   const flowNodesRef = useRef<FlowNode[]>([]);
   const onNodeClickRef = useRef(onNodeClick);
   const stageSizeRef = useRef<StageSize>({ height: 0, width: 0 });
@@ -133,21 +130,15 @@ function GraphCanvasInner({
   const nodePointerDownRef = useRef<{ nodeId: string; x: number; y: number } | null>(null);
   const lastTapRef = useRef<{ nodeId: string; timestamp: number } | null>(null);
   const singleClickTimerRef = useRef<number | null>(null);
+  const [graphViewState, dispatchGraphView] = useReducer(graphViewReducer, undefined, () => createGraphViewState());
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
   const [flowEdges, setFlowEdges] = useState<FlowEdge[]>([]);
-  const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
   const [stageSize, setStageSize] = useState<StageSize>({ height: 0, width: 0 });
   const [layoutResult, setLayoutResult] = useState<LayoutResult | null>(null);
-  const [nodeOverrides, setNodeOverrides] = useState<NodeOverrideMap>({});
-  const [scopedNodeId, setScopedNodeId] = useState<string | null>(null);
-  const [scopeMode, setScopeMode] = useState<GraphScopeMode>("direct");
   const [isViewportActive, setIsViewportActive] = useState(false);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const reactFlow = useReactFlow<FlowNode, FlowEdge>();
-
-  useEffect(() => {
-    nodeOverridesRef.current = nodeOverrides;
-  }, [nodeOverrides]);
+  const { nodeOverrides, scopedNodeId, scopeMode, viewport } = graphViewState;
 
   useEffect(() => {
     flowNodesRef.current = flowNodes;
@@ -168,7 +159,7 @@ function GraphCanvasInner({
   useOnViewportChange({
     onChange: (nextViewport) => {
       viewportRef.current = nextViewport;
-      setViewport(nextViewport);
+      dispatchGraphView({ type: "setViewport", viewport: nextViewport });
     }
   });
 
@@ -188,41 +179,20 @@ function GraphCanvasInner({
 
     const storedScene = loadGraphScene(sceneStorageKey);
     const availableNodeIds = new Set(nodes.map((node) => node.id));
-    const nextOverrides = filterNodeOverrides(storedScene?.nodeOverrides ?? {}, availableNodeIds);
-    const nextScopedNodeId =
-      storedScene?.scopedNodeId && availableNodeIds.has(storedScene.scopedNodeId) ? storedScene.scopedNodeId : null;
-    const nextScopeMode = storedScene?.scopeMode === "connected" ? "connected" : "direct";
-    const nextViewport = storedScene ? sanitizeStoredViewport(storedScene.view) : DEFAULT_VIEWPORT;
+    const nextState = createGraphViewStateFromScene(storedScene, availableNodeIds);
 
     restoredSceneKeyRef.current = storedScene ? sceneStorageKey ?? null : null;
     initializedSceneKeyRef.current = null;
     previousScopeSignatureRef.current = null;
     sceneHydratedRef.current = true;
-    nodeOverridesRef.current = nextOverrides;
-    setNodeOverrides(nextOverrides);
-    setScopedNodeId(nextScopedNodeId);
-    setScopeMode(nextScopeMode);
-    applyViewport(nextViewport);
+    dispatchGraphView({ state: nextState, type: "restoreScene" });
+    applyViewport(nextState.viewport);
   }, [sceneStorageKey, nodes]);
 
   useEffect(() => {
     const currentNodeIds = new Set(nodes.map((node) => node.id));
-    setNodeOverrides((currentOverrides) => {
-      const nextOverrides = filterNodeOverrides(currentOverrides, currentNodeIds);
-      nodeOverridesRef.current = nextOverrides;
-      return hasEqualNodeOverrides(currentOverrides, nextOverrides) ? currentOverrides : nextOverrides;
-    });
+    dispatchGraphView({ availableNodeIds: currentNodeIds, type: "syncAvailableNodes" });
   }, [nodes]);
-
-  useEffect(() => {
-    if (!scopedNodeId) {
-      return;
-    }
-
-    if (!nodes.some((node) => node.id === scopedNodeId)) {
-      setScopedNodeId(null);
-    }
-  }, [nodes, scopedNodeId]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -255,7 +225,7 @@ function GraphCanvasInner({
     void buildElkLayout(
       scopedGraph.nodes,
       scopedGraph.edges,
-      nodeOverridesRef.current,
+      nodeOverrides,
       formatNodeKind,
       formatEdgeType,
       selectedNodeId,
@@ -274,7 +244,7 @@ function GraphCanvasInner({
     return () => {
       cancelled = true;
     };
-  }, [formatEdgeType, formatNodeKind, scopedGraph.edges, scopedGraph.nodes, selectedNodeId]);
+  }, [formatEdgeType, formatNodeKind, nodeOverrides, scopedGraph.edges, scopedGraph.nodes, selectedNodeId]);
 
   useLayoutEffect(() => {
     if (!layoutResult || stageSize.width === 0 || stageSize.height === 0) {
@@ -372,16 +342,9 @@ function GraphCanvasInner({
     restoredSceneKeyRef.current = null;
     initializedSceneKeyRef.current = null;
     previousScopeSignatureRef.current = null;
-    setScopedNodeId(null);
-    setScopeMode("direct");
-    setNodeOverrides({});
-    nodeOverridesRef.current = {};
-
-    if (layoutResult) {
-      applyViewport(resolveInitialViewport(layoutResult, stageSize), 160);
-    } else {
-      applyViewport(DEFAULT_VIEWPORT);
-    }
+    const nextViewport = layoutResult ? resolveInitialViewport(layoutResult, stageSize) : DEFAULT_VIEWPORT;
+    dispatchGraphView({ type: "reset", viewport: nextViewport });
+    applyViewport(nextViewport, 160);
   }
 
   function handleGraphNodeActivate(nodeId: string) {
@@ -394,7 +357,7 @@ function GraphCanvasInner({
   }
 
   function handleGraphNodeScopeToggle(nodeId: string) {
-    setScopedNodeId((currentNodeId) => (currentNodeId === nodeId ? null : nodeId));
+    dispatchGraphView({ nodeId, type: "toggleScopedNode" });
   }
 
   function handleGraphNodePointerDown(nodeId: string, clientX: number, clientY: number) {
@@ -451,7 +414,7 @@ function GraphCanvasInner({
 
     viewportRef.current = sanitizedViewport;
     pendingViewportRef.current = sanitizedViewport;
-    setViewport(sanitizedViewport);
+    dispatchGraphView({ type: "setViewport", viewport: sanitizedViewport });
 
     if (!reactFlowReadyRef.current) {
       return;
@@ -470,13 +433,14 @@ function GraphCanvasInner({
   }
 
   function handleNodeDragStop(_event: MouseEvent | TouchEvent, node: FlowNode) {
-    setNodeOverrides((currentOverrides) => ({
-      ...currentOverrides,
-      [node.id]: {
+    dispatchGraphView({
+      nodeId: node.id,
+      position: {
         x: node.position.x,
         y: node.position.y
-      }
-    }));
+      },
+      type: "setNodeOverride"
+    });
     setIsCanvasDragging(false);
   }
 
@@ -505,7 +469,7 @@ function GraphCanvasInner({
               type="button"
               className={scopeMode === "direct" ? "is-active" : ""}
               disabled={!focusedNode}
-              onClick={() => setScopeMode("direct")}
+              onClick={() => dispatchGraphView({ scopeMode: "direct", type: "setScopeMode" })}
             >
               {labels.scopeDirect}
             </button>
@@ -513,13 +477,13 @@ function GraphCanvasInner({
               type="button"
               className={scopeMode === "connected" ? "is-active" : ""}
               disabled={!focusedNode}
-              onClick={() => setScopeMode("connected")}
+              onClick={() => dispatchGraphView({ scopeMode: "connected", type: "setScopeMode" })}
             >
               {labels.scopeConnected}
             </button>
           </div>
           {focusedNode ? (
-            <button type="button" onClick={() => setScopedNodeId(null)}>
+            <button type="button" onClick={() => dispatchGraphView({ type: "clearScope" })}>
               {labels.clearScope}
             </button>
           ) : null}

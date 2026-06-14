@@ -40,7 +40,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Suggested split: project workspace, snapshot panel, change panel, graph workspace, and settings.
 - [x] Split `GraphCanvas.tsx` by responsibility.
   Suggested split: layout, viewport state, node interaction, edge rendering, and persisted scene state.
-- [ ] Centralize graph state transitions.
+- [x] Centralize graph state transitions.
   Done when fullscreen, filtered graph views, focus changes, and reset behavior are driven by predictable state instead of scattered handlers.
 
 ## P1: Graph Performance and Usability

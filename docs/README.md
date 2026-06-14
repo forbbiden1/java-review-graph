@@ -19,17 +19,19 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
    Backend responsibilities, persistence shape, and API layering.
 6. [web-design.md](./web-design.md)
    Frontend screen structure and graph interaction rules.
-7. [api.md](./api.md)
+7. [graph-reactflow-elk-migration.md](./graph-reactflow-elk-migration.md)
+   Frontend graph renderer migration notes and implementation status.
+8. [api.md](./api.md)
    External API draft.
-8. [schema.md](./schema.md)
+9. [schema.md](./schema.md)
    Storage model and symbol identity rules.
-9. [schema.sql](./schema.sql)
+10. [schema.sql](./schema.sql)
    Initial SQL draft.
-10. [dev-setup.md](./dev-setup.md)
+11. [dev-setup.md](./dev-setup.md)
     Local development setup and current build notes.
-11. [roadmap.md](./roadmap.md)
+12. [roadmap.md](./roadmap.md)
     Milestone order.
-12. [todo.md](./todo.md)
+13. [todo.md](./todo.md)
     Prioritized post-MVP follow-up work.
 
 ## Document Roles
@@ -41,7 +43,7 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
 - Backend and persistence:
   `server-design.md`, `api.md`, `schema.md`, `schema.sql`
 - Frontend:
-  `web-design.md`
+  `web-design.md`, `graph-reactflow-elk-migration.md`
 - Execution support:
   `dev-setup.md`, `roadmap.md`, `todo.md`
 

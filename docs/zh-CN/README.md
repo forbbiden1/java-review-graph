@@ -17,17 +17,19 @@
    后端职责、持久化方向和 API 分层。
 6. [web-design.md](./web-design.md)
    前端页面结构和图交互规则。
-7. [api.md](./api.md)
+7. [graph-reactflow-elk-migration.md](./graph-reactflow-elk-migration.md)
+   前端图渲染器迁移说明和当前实现状态。
+8. [api.md](./api.md)
    对外 API 草案。
-8. [schema.md](./schema.md)
+9. [schema.md](./schema.md)
    存储模型和符号稳定标识规则。
-9. [../schema.sql](../schema.sql)
+10. [../schema.sql](../schema.sql)
    初版 SQL 草案，SQL 本身不再单独翻译。
-10. [dev-setup.md](./dev-setup.md)
+11. [dev-setup.md](./dev-setup.md)
     本地开发环境说明和当前构建注意事项。
-11. [roadmap.md](./roadmap.md)
+12. [roadmap.md](./roadmap.md)
     里程碑顺序。
-12. [todo.md](./todo.md)
+13. [todo.md](./todo.md)
     按优先级整理的 MVP 后续待办。
 
 ## 文档分工
@@ -39,7 +41,7 @@
 - 后端和存储：
   `server-design.md`、`api.md`、`schema.md`、`../schema.sql`
 - 前端：
-  `web-design.md`
+  `web-design.md`、`graph-reactflow-elk-migration.md`
 - 开发辅助：
   `dev-setup.md`、`roadmap.md`、`todo.md`
 

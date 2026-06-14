@@ -12,6 +12,8 @@ import com.acme.graphreview.domain.StoredSourceFile;
 import com.acme.graphreview.domain.StoredSymbolChange;
 import com.acme.graphreview.infrastructure.GitChangedFiles;
 import com.acme.graphreview.infrastructure.GitSnapshotMetadataResolver;
+import com.acme.model.graph.RelationRecord;
+import com.acme.model.graph.RelationType;
 import com.acme.model.graph.SymbolKind;
 import com.acme.model.graph.SymbolRecord;
 import com.acme.model.graph.SymbolType;
@@ -58,6 +60,9 @@ class ChangeSetReviewServiceTest {
                         storedFile("src/main/java/demo/Controller.java")
                 )),
                 new StubSymbolRepository(List.of(changedType, impactedType)),
+                new StubRelationRepository(List.of(
+                        relation(changedType.symbolKey(), impactedType.symbolKey(), RelationType.USES_TYPE)
+                )),
                 new StubSymbolChangeRepository(List.of(
                         new StoredSymbolChange("change-1", project.id(), snapshot.id(), impactedType.symbolKey(), null, impactedType.symbolKey(), "impacted", "one-hop")
                 )),
@@ -83,6 +88,10 @@ class ChangeSetReviewServiceTest {
         assertTrue(result.risk().reasons().contains("Public API or deleted symbol changed."));
         assertTrue(result.risk().reasons().contains("One-hop impacted symbols were found."));
         assertEquals(changedType.symbolKey(), result.reviewTargets().get(0).symbolKey());
+        assertEquals(1, result.propagationPaths().size());
+        assertEquals("demo.Service", result.propagationPaths().get(0).fromSymbol().qualifiedName());
+        assertEquals("demo.Controller", result.propagationPaths().get(0).toSymbol().qualifiedName());
+        assertEquals(RelationType.USES_TYPE, result.propagationPaths().get(0).relationType());
         assertTrue(result.summary().contains("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s). Risk level: medium."));
     }
 
@@ -119,6 +128,9 @@ class ChangeSetReviewServiceTest {
                         storedFile("src/main/java/demo/Controller.java")
                 )),
                 new StubSymbolRepository(List.of(changedType, impactedType)),
+                new StubRelationRepository(List.of(
+                        relation(changedType.symbolKey(), impactedType.symbolKey(), RelationType.USES_TYPE)
+                )),
                 new StubSymbolChangeRepository(List.of(
                         new StoredSymbolChange("change-1", project.id(), snapshot.id(), impactedType.symbolKey(), null, impactedType.symbolKey(), "impacted", "one-hop")
                 )),
@@ -136,6 +148,8 @@ class ChangeSetReviewServiceTest {
         assertEquals("change-set-review-project-1-review-baseline-git.md", report.fileName());
         assertTrue(report.markdown().contains("# Change-Set Review Report"));
         assertTrue(report.markdown().contains("## Risk"));
+        assertTrue(report.markdown().contains("## Propagation Paths"));
+        assertTrue(report.markdown().contains("`demo.Service` -> `demo.Controller` via `uses_type`"));
         assertTrue(report.markdown().contains("`demo.Service` (`class`, `modified_api`, `changed`)"));
         assertTrue(report.markdown().contains("Public API or deleted symbol changed."));
     }
@@ -168,6 +182,10 @@ class ChangeSetReviewServiceTest {
 
     private static StoredSourceFile storedFile(String path) {
         return new StoredSourceFile("file-" + path, path, "root", "demo", "hash-" + path, "main");
+    }
+
+    private static RelationRecord relation(String sourceSymbolKey, String targetSymbolKey, RelationType relationType) {
+        return new RelationRecord(sourceSymbolKey, targetSymbolKey, relationType, "exact", "src/main/java/demo/Service.java", 6);
     }
 
     private static final class StubProjectService extends ProjectService {
@@ -283,6 +301,44 @@ class ChangeSetReviewServiceTest {
         @Override
         public List<StoredSymbolChange> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
             return changes;
+        }
+    }
+
+    private static final class StubRelationRepository implements RelationRepository {
+        private final List<RelationRecord> relations;
+
+        private StubRelationRepository(List<RelationRecord> relations) {
+            this.relations = relations;
+        }
+
+        @Override
+        public void saveAll(String projectId, String snapshotId, List<RelationRecord> relations, Map<String, String> fileIdsByPath) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<RelationRecord> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
+            return relations;
+        }
+
+        @Override
+        public List<RelationRecord> findByProjectIdAndSnapshotIdAndTypes(String projectId, String snapshotId, List<RelationType> relationTypes) {
+            return relations.stream()
+                    .filter(relation -> relationTypes.contains(relation.relationType()))
+                    .toList();
+        }
+
+        @Override
+        public List<RelationRecord> findByProjectIdAndSnapshotIdAndSymbolKeys(
+                String projectId,
+                String snapshotId,
+                RelationType relationType,
+                java.util.Set<String> sourceOrTargetSymbolKeys
+        ) {
+            return relations.stream()
+                    .filter(relation -> relation.relationType() == relationType)
+                    .filter(relation -> sourceOrTargetSymbolKeys.contains(relation.sourceSymbolKey()) || sourceOrTargetSymbolKeys.contains(relation.targetSymbolKey()))
+                    .toList();
         }
     }
 

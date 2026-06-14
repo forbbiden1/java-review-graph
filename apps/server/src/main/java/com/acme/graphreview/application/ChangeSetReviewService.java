@@ -7,6 +7,8 @@ import com.acme.graphreview.infrastructure.GitChangedFiles;
 import com.acme.graphreview.infrastructure.GitSnapshotMetadataResolver;
 import com.acme.graphreview.infrastructure.ProjectValidationException;
 import com.acme.graphreview.infrastructure.SnapshotNotFoundException;
+import com.acme.model.graph.RelationRecord;
+import com.acme.model.graph.RelationType;
 import com.acme.model.graph.SymbolRecord;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -24,6 +26,7 @@ public class ChangeSetReviewService {
     private final SnapshotRepository snapshotRepository;
     private final SourceFileRepository sourceFileRepository;
     private final SymbolRepository symbolRepository;
+    private final RelationRepository relationRepository;
     private final SymbolChangeRepository symbolChangeRepository;
     private final GitSnapshotMetadataResolver gitSnapshotMetadataResolver;
 
@@ -32,6 +35,7 @@ public class ChangeSetReviewService {
             SnapshotRepository snapshotRepository,
             SourceFileRepository sourceFileRepository,
             SymbolRepository symbolRepository,
+            RelationRepository relationRepository,
             SymbolChangeRepository symbolChangeRepository,
             GitSnapshotMetadataResolver gitSnapshotMetadataResolver
     ) {
@@ -39,6 +43,7 @@ public class ChangeSetReviewService {
         this.snapshotRepository = snapshotRepository;
         this.sourceFileRepository = sourceFileRepository;
         this.symbolRepository = symbolRepository;
+        this.relationRepository = relationRepository;
         this.symbolChangeRepository = symbolChangeRepository;
         this.gitSnapshotMetadataResolver = gitSnapshotMetadataResolver;
     }
@@ -66,6 +71,11 @@ public class ChangeSetReviewService {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         List<StoredSymbolChange> persistedChanges = symbolChangeRepository.findByProjectIdAndSnapshotId(project.id(), snapshot.id());
+        List<RelationRecord> relations = relationRepository.findByProjectIdAndSnapshotIdAndTypes(
+                project.id(),
+                snapshot.id(),
+                List.of(RelationType.EXTENDS, RelationType.IMPLEMENTS, RelationType.USES_TYPE, RelationType.CALLS, RelationType.OVERRIDES)
+        );
         LinkedHashSet<String> impactedSymbolKeys = persistedChanges.stream()
                 .filter(change -> "impacted".equalsIgnoreCase(change.changeType()) || "deleted".equalsIgnoreCase(change.changeType()))
                 .map(StoredSymbolChange::symbolKey)
@@ -82,6 +92,7 @@ public class ChangeSetReviewService {
                 .filter(symbol -> !changedSymbolKeys.contains(symbol.symbolKey()))
                 .map(symbol -> ChangeSetReviewSymbol.from(symbol, "impacted"))
                 .toList();
+        List<PropagationPath> propagationPaths = buildPropagationPaths(changedSymbolKeys, impactedSymbolKeys, symbolByKey, relations);
 
         ChangeSetRiskSummary riskSummary = scoreRisk(changedSymbols, impactedSymbols, persistedChanges, normalizedPaths.size());
         List<ChangeSetReviewSymbol> reviewTargets = buildReviewTargets(changedSymbols, impactedSymbols);
@@ -104,6 +115,7 @@ public class ChangeSetReviewService {
                 changedSymbols,
                 impactedSymbols,
                 reviewTargets,
+                propagationPaths,
                 riskSummary,
                 summary
         );
@@ -282,6 +294,7 @@ public class ChangeSetReviewService {
         appendPathSection(markdown, "Changed Files", result.changedFiles());
         appendPathSection(markdown, "Renamed Paths", result.renamedPaths());
         appendSymbolSection(markdown, "Prioritized Review Targets", result.reviewTargets());
+        appendPropagationSection(markdown, "Propagation Paths", result.propagationPaths());
         appendSymbolSection(markdown, "Changed Symbols", result.changedSymbols());
         appendSymbolSection(markdown, "Impacted Symbols", result.impactedSymbols());
         return markdown.toString();
@@ -297,6 +310,74 @@ public class ChangeSetReviewService {
             markdown.append("- `").append(path).append("`\n");
         }
         markdown.append("\n");
+    }
+
+    private void appendPropagationSection(StringBuilder markdown, String title, List<PropagationPath> paths) {
+        markdown.append("## ").append(title).append("\n\n");
+        if (paths.isEmpty()) {
+            markdown.append("- None\n\n");
+            return;
+        }
+        for (PropagationPath path : paths) {
+            markdown.append("- `").append(path.fromSymbol().qualifiedName()).append("` -> `")
+                    .append(path.toSymbol().qualifiedName()).append("`");
+            markdown.append(" via `").append(path.relationType().name().toLowerCase(Locale.ROOT)).append("`");
+            if (path.sourceLine() != null) {
+                markdown.append(" at line ").append(path.sourceLine());
+            }
+            markdown.append("\n");
+        }
+        markdown.append("\n");
+    }
+
+    private List<PropagationPath> buildPropagationPaths(
+            Set<String> changedSymbolKeys,
+            Set<String> impactedSymbolKeys,
+            Map<String, SymbolRecord> symbolByKey,
+            List<RelationRecord> relations
+    ) {
+        List<PropagationPath> paths = new java.util.ArrayList<>();
+        for (String impactedSymbolKey : impactedSymbolKeys) {
+            if (!symbolByKey.containsKey(impactedSymbolKey)) {
+                continue;
+            }
+            for (String changedSymbolKey : changedSymbolKeys) {
+                if (!symbolByKey.containsKey(changedSymbolKey)) {
+                    continue;
+                }
+                PropagationPath path = findDirectPropagationPath(changedSymbolKey, impactedSymbolKey, symbolByKey, relations);
+                if (path != null) {
+                    paths.add(path);
+                    break;
+                }
+            }
+        }
+        return List.copyOf(paths);
+    }
+
+    private PropagationPath findDirectPropagationPath(
+            String changedSymbolKey,
+            String impactedSymbolKey,
+            Map<String, SymbolRecord> symbolByKey,
+            List<RelationRecord> relations
+    ) {
+        for (RelationRecord relation : relations) {
+            if (matchesPath(relation, changedSymbolKey, impactedSymbolKey)) {
+                return new PropagationPath(
+                        ChangeSetReviewSymbol.from(symbolByKey.get(changedSymbolKey), "changed"),
+                        ChangeSetReviewSymbol.from(symbolByKey.get(impactedSymbolKey), "impacted"),
+                        relation.relationType(),
+                        relation.filePath(),
+                        relation.sourceLine()
+                );
+            }
+        }
+        return null;
+    }
+
+    private boolean matchesPath(RelationRecord relation, String changedSymbolKey, String impactedSymbolKey) {
+        return (relation.sourceSymbolKey().equals(changedSymbolKey) && relation.targetSymbolKey().equals(impactedSymbolKey))
+                || (relation.targetSymbolKey().equals(changedSymbolKey) && relation.sourceSymbolKey().equals(impactedSymbolKey));
     }
 
     private void appendSymbolSection(StringBuilder markdown, String title, List<ChangeSetReviewSymbol> symbols) {
@@ -341,6 +422,7 @@ public class ChangeSetReviewService {
             List<ChangeSetReviewSymbol> changedSymbols,
             List<ChangeSetReviewSymbol> impactedSymbols,
             List<ChangeSetReviewSymbol> reviewTargets,
+            List<PropagationPath> propagationPaths,
             ChangeSetRiskSummary risk,
             String summary
     ) {
@@ -356,6 +438,15 @@ public class ChangeSetReviewService {
     public record ChangeSetReviewMarkdownReport(
             String fileName,
             String markdown
+    ) {
+    }
+
+    public record PropagationPath(
+            ChangeSetReviewSymbol fromSymbol,
+            ChangeSetReviewSymbol toSymbol,
+            RelationType relationType,
+            String filePath,
+            Integer sourceLine
     ) {
     }
 

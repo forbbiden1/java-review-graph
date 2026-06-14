@@ -2,6 +2,7 @@ package com.acme.graphreview.api;
 
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewResult;
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewSymbol;
+import com.acme.graphreview.application.ChangeSetReviewService.PropagationPath;
 import java.util.List;
 
 public record ChangeSetReviewResponse(
@@ -15,6 +16,7 @@ public record ChangeSetReviewResponse(
         List<ChangeSetReviewSymbolResponse> changedSymbols,
         List<ChangeSetReviewSymbolResponse> impactedSymbols,
         List<ChangeSetReviewSymbolResponse> reviewTargets,
+        List<PropagationPathResponse> propagationPaths,
         RiskResponse risk,
         String summary
 ) {
@@ -30,6 +32,7 @@ public record ChangeSetReviewResponse(
                 result.changedSymbols().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
                 result.impactedSymbols().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
                 result.reviewTargets().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
+                result.propagationPaths().stream().map(PropagationPathResponse::from).toList(),
                 RiskResponse.from(result.risk()),
                 result.summary()
         );
@@ -61,6 +64,24 @@ public record ChangeSetReviewResponse(
                     symbol.kind(),
                     symbol.status(),
                     symbol.reviewRole()
+            );
+        }
+    }
+
+    public record PropagationPathResponse(
+            ChangeSetReviewSymbolResponse fromSymbol,
+            ChangeSetReviewSymbolResponse toSymbol,
+            String relationType,
+            String filePath,
+            Integer sourceLine
+    ) {
+        private static PropagationPathResponse from(PropagationPath path) {
+            return new PropagationPathResponse(
+                    ChangeSetReviewSymbolResponse.from(path.fromSymbol()),
+                    ChangeSetReviewSymbolResponse.from(path.toSymbol()),
+                    path.relationType().name().toLowerCase(),
+                    path.filePath(),
+                    path.sourceLine()
             );
         }
     }

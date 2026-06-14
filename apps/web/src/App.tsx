@@ -1589,6 +1589,44 @@ function ChangeSetReviewPanel({
         </ul>
       </section>
 
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>Propagation Paths</strong>
+          <span>{result.propagationPaths.length}</span>
+        </div>
+        {result.propagationPaths.length === 0 ? (
+          <p className="diagnostic-path-empty">None</p>
+        ) : (
+          <div className="list-stack">
+            {result.propagationPaths.map((path) => (
+              <article
+                key={`${path.fromSymbol.symbolKey}:${path.toSymbol.symbolKey}:${path.relationType}`}
+                className="change-card status-impacted"
+              >
+                <div className="change-head">
+                  <span className="status-pill status-impacted">{formatEdgeTypeLabel(path.relationType, language)}</span>
+                  <code>
+                    {compactSymbolKey(path.fromSymbol.symbolKey)} -&gt; {compactSymbolKey(path.toSymbol.symbolKey)}
+                  </code>
+                </div>
+                <strong>
+                  {path.fromSymbol.displayName} -&gt; {path.toSymbol.displayName}
+                </strong>
+                <p>
+                  {path.fromSymbol.qualifiedName} -&gt; {path.toSymbol.qualifiedName}
+                </p>
+                {path.filePath ? (
+                  <p className="review-path-meta">
+                    <code>{path.filePath}</code>
+                    {path.sourceLine ? `:${path.sourceLine}` : ""}
+                  </p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <DiagnosticPathSection
         title={changedFiles ? "Manual Changed Files" : "Changed Files"}
         paths={result.changedFiles}

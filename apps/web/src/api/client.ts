@@ -95,6 +95,14 @@ export type ChangeSetReviewRisk = {
   reasons: string[];
 };
 
+export type ChangeSetPropagationPath = {
+  fromSymbol: ChangeSetReviewSymbol;
+  toSymbol: ChangeSetReviewSymbol;
+  relationType: string;
+  filePath: string | null;
+  sourceLine: number | null;
+};
+
 export type ChangeSetReviewResult = {
   projectId: string;
   snapshotId: string;
@@ -106,6 +114,7 @@ export type ChangeSetReviewResult = {
   changedSymbols: ChangeSetReviewSymbol[];
   impactedSymbols: ChangeSetReviewSymbol[];
   reviewTargets: ChangeSetReviewSymbol[];
+  propagationPaths: ChangeSetPropagationPath[];
   risk: ChangeSetReviewRisk;
   summary: string;
 };

@@ -75,3 +75,4 @@
 - 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`
 - 当前 UI 已经接到现有后端接口和 SQLite 快照数据
 - 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告
+- change-set review 面板现在还会展示直接传播路径，帮助解释为什么某个变更会影响下游 review 目标

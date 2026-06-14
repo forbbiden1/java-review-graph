@@ -37,6 +37,7 @@ class ChangeSetReviewIntegrationTest {
         insertSourceFile(projectId, snapshotId, impactedFileId, "src/main/java/demo/Controller.java", now);
         insertSymbol(projectId, snapshotId, changedFileId, "type:demo.Service", "Service", "demo.Service", "modified_api", "CLASS");
         insertSymbol(projectId, snapshotId, impactedFileId, "type:demo.Controller", "Controller", "demo.Controller", "impacted", "CLASS");
+        insertRelation(projectId, snapshotId, "relation-change-set-1", "type:demo.Service", "type:demo.Controller", "uses_type");
         insertSymbolChange(projectId, snapshotId, "change-impacted-1", "type:demo.Controller", "impacted");
 
         mockMvc.perform(post("/api/projects/{projectId}/review/change-set", projectId)
@@ -58,6 +59,9 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.impactedSymbols[0].symbolKey").value("type:demo.Controller"))
                 .andExpect(jsonPath("$.impactedSymbols[0].reviewRole").value("impacted"))
                 .andExpect(jsonPath("$.reviewTargets[0].symbolKey").value("type:demo.Service"))
+                .andExpect(jsonPath("$.propagationPaths[0].fromSymbol.symbolKey").value("type:demo.Service"))
+                .andExpect(jsonPath("$.propagationPaths[0].toSymbol.symbolKey").value("type:demo.Controller"))
+                .andExpect(jsonPath("$.propagationPaths[0].relationType").value("uses_type"))
                 .andExpect(jsonPath("$.risk.level").value("medium"))
                 .andExpect(jsonPath("$.risk.score").value(4))
                 .andExpect(jsonPath("$.risk.reasons[0]").value("Public API or deleted symbol changed."))
@@ -78,6 +82,7 @@ class ChangeSetReviewIntegrationTest {
         insertSourceFile(projectId, snapshotId, impactedFileId, "src/main/java/demo/Controller.java", now);
         insertSymbol(projectId, snapshotId, changedFileId, "type:demo.ServiceExport", "Service", "demo.ServiceExport", "modified_api", "CLASS");
         insertSymbol(projectId, snapshotId, impactedFileId, "type:demo.ControllerExport", "Controller", "demo.ControllerExport", "impacted", "CLASS");
+        insertRelation(projectId, snapshotId, "relation-change-set-2", "type:demo.ServiceExport", "type:demo.ControllerExport", "uses_type");
         insertSymbolChange(projectId, snapshotId, "change-impacted-2", "type:demo.ControllerExport", "impacted");
 
         mockMvc.perform(post("/api/projects/{projectId}/review/change-set/markdown", projectId)
@@ -95,6 +100,8 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.fileName").value("change-set-review-project-change-set-2-review-baseline-manual.md"))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("# Change-Set Review Report")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Prioritized Review Targets")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Propagation Paths")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("`demo.ServiceExport` -> `demo.ControllerExport` via `uses_type`")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }
 
@@ -211,6 +218,35 @@ class ChangeSetReviewIntegrationTest {
                 symbolKey,
                 changeType,
                 "change-set-test"
+        );
+    }
+
+    private void insertRelation(
+            String projectId,
+            String snapshotId,
+            String relationId,
+            String sourceSymbolKey,
+            String targetSymbolKey,
+            String relationType
+    ) {
+        jdbcTemplate.update(
+                """
+                insert into relation (
+                    id, project_id, snapshot_id, source_symbol_key, target_symbol_key, relation_type,
+                    confidence, source_file_id, source_line, metadata_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                relationId,
+                projectId,
+                snapshotId,
+                sourceSymbolKey,
+                targetSymbolKey,
+                relationType,
+                "exact",
+                null,
+                6,
+                null
         );
     }
 }

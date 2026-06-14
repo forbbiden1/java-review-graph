@@ -76,3 +76,4 @@ Current implementation notes:
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
+- the change-set review panel also shows direct propagation paths so users can explain why one changed symbol affects a downstream review target

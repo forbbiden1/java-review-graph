@@ -159,6 +159,20 @@
 - 返回 `added`、`modified_api`、`modified_impl`、`impacted`、`deleted`
 - `impacted` 基于一跳传播规则计算
 
+## `GET /api/projects/{projectId}/symbols/path?snapshotId={snapshotId}&sourceSymbolKey={sourceSymbolKey}&targetSymbolKey={targetSymbolKey}&maxDepth=4`
+
+查询两个符号之间的依赖或调用路径，用于 review 影响追踪。
+
+当前行为：
+
+- 未传 `snapshotId` 时默认解析到最新快照
+- 必须传入 `sourceSymbolKey` 和 `targetSymbolKey`
+- `maxDepth` 限制在 `1` 到 `8` 之间，默认值为 `4`
+- 在持久化的 `extends`、`implements`、`uses_type`、`calls`、`overrides` 关系上执行有界最短路径搜索
+- 返回按追踪顺序排列的符号节点和关系片段
+- API 响应中的 `relationType` 使用小写字符串，便于前端统一展示
+- 当符号不存在或深度范围内没有路径时，返回 `found = false` 和解释性的 `note`
+
 ## `POST /api/projects/{projectId}/review/change-set`
 
 对一个快照执行 change-set review。

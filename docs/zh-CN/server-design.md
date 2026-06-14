@@ -75,9 +75,11 @@
 
 - 类图只读取所需的类型级关系
 - 方法图只读取当前类范围内的调用关系
+- 符号路径查询会在持久化的 `EXTENDS`、`IMPLEMENTS`、`USES_TYPE`、`CALLS`、`OVERRIDES` 关系上执行有界 BFS，用于解释两个 review 相关符号之间的多跳追踪路径
 - change-set review 基于单快照和 Git 自动、手工文件列表或 `baseCommit -> targetCommit` 提交区间生成风险、目标、传播路径和测试建议
 - 提交区间 review 只读取两端 commit 的已提交 diff，并保留 rename / move 路径，不会混入当前工作区未提交改动
 - 风险摘要现在同时保留纯文本原因和结构化因子，结构化因子会记录规则代码、分值贡献、严重级别和证据
+- UI 也可以在 review 结果之外再单独调用符号路径接口，展示一条有界的影响追踪链路，而不改变确定性的 review 返回体
 - snapshot compare 直接读取两个快照中的持久化符号集和结构关系集，输出符号变化以及 `extends`、`implements`、`uses_type`、`calls`、`overrides` 等关系的新增与删除
 
 ## 持久化方向

@@ -80,6 +80,7 @@
 - change-set review 控件已与索引控件解耦，支持 Git 自动、手工文件列表和明确提交区间三种来源
 - 同一个 review 面板现在还会展示结构化风险因子、分值贡献和证据，方便在演示里解释为什么风险等级会落到低 / 中 / 高
 - change-set review 面板现在还会展示直接传播路径，帮助解释为什么某一个变更会影响下游 review 目标
+- review 面板现在还会补充一条 changed symbol 到 impacted symbol 的有界 impact trace，用多跳路径解释结构影响是如何传递的
 - 同一个面板现在还会给出确定性的测试关注建议，让演示可以自然落到具体回归或集成测试目标
 - 同一个右侧检查区现在也支持 snapshot-to-snapshot compare，可先选择一个基线快照，再查看与当前快照之间的确定性符号差异和结构关系演进
 - `App.tsx` 现在只保留工作区状态与流程编排；通用面板组件拆到 `src/app/components.tsx`，图谱、快照与 review 展示相关的纯工具函数拆到 `src/app/utils.ts`

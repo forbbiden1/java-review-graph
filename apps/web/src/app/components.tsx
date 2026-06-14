@@ -5,7 +5,8 @@ import type {
   ProjectSnapshot,
   SnapshotCompareResult,
   SnapshotDiagnostics,
-  SymbolChange
+  SymbolChange,
+  SymbolPathResult
 } from "../api/client";
 import { formatEdgeTypeLabel, formatStatusLabel } from "../i18n";
 import type { LanguageMode } from "../platform";
@@ -602,6 +603,8 @@ type ChangeSetReviewPanelProps = {
   reviewSourceLabel: string;
   reviewSourceValue: ReviewChangeSource;
   reviewTargetsLabel: string;
+  symbolPath: SymbolPathResult | null;
+  symbolPathLoading: boolean;
 };
 
 export function ChangeSetReviewPanel({
@@ -614,7 +617,9 @@ export function ChangeSetReviewPanel({
   result,
   reviewSourceLabel,
   reviewSourceValue,
-  reviewTargetsLabel
+  reviewTargetsLabel,
+  symbolPath,
+  symbolPathLoading
 }: ChangeSetReviewPanelProps) {
   if (!result) {
     return <EmptyState title={emptyTitle} body={emptyBody} />;
@@ -735,6 +740,8 @@ export function ChangeSetReviewPanel({
         )}
       </section>
 
+      <SymbolPathTraceSection language={language} loading={symbolPathLoading} path={symbolPath} />
+
       <section className="review-report-section">
         <div className="diagnostic-path-header">
           <strong>Test Focus Suggestions</strong>
@@ -774,6 +781,87 @@ export function ChangeSetReviewPanel({
         </section>
       ) : null}
     </div>
+  );
+}
+
+function SymbolPathTraceSection({
+  language,
+  loading,
+  path
+}: {
+  language: LanguageMode;
+  loading: boolean;
+  path: SymbolPathResult | null;
+}) {
+  if (loading) {
+    return (
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>Impact Trace</strong>
+          <span>...</span>
+        </div>
+        <p className="diagnostic-path-empty">Loading symbol path...</p>
+      </section>
+    );
+  }
+
+  if (!path) {
+    return (
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
+          <strong>Impact Trace</strong>
+          <span>0</span>
+        </div>
+        <p className="diagnostic-path-empty">No changed-to-impacted symbol pair available for path tracing.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="review-report-section">
+      <div className="diagnostic-path-header">
+        <strong>Impact Trace</strong>
+        <span>{path.found ? path.segments.length : 0}</span>
+      </div>
+      {!path.found ? (
+        <p className="diagnostic-path-empty">{path.note}</p>
+      ) : (
+        <>
+          <div className="symbol-path-chain">
+            {path.nodes.map((node, index) => (
+              <span key={node.symbolKey} className="symbol-path-node">
+                <span className={`status-pill status-${node.status}`}>{formatStatusLabel(node.status, language)}</span>
+                <strong>{node.displayName}</strong>
+                <code>{compactSymbolKey(node.symbolKey)}</code>
+                {index < path.nodes.length - 1 ? <span className="symbol-path-arrow">-&gt;</span> : null}
+              </span>
+            ))}
+          </div>
+          <div className="list-stack">
+            {path.segments.map((segment, index) => (
+              <article
+                key={`${segment.sourceSymbolKey}:${segment.targetSymbolKey}:${segment.relationType}:${index}`}
+                className="change-card status-impacted"
+              >
+                <div className="change-head">
+                  <span className="status-pill status-impacted">{formatEdgeTypeLabel(segment.relationType, language)}</span>
+                  <code>
+                    {compactSymbolKey(segment.sourceSymbolKey)} -&gt; {compactSymbolKey(segment.targetSymbolKey)}
+                  </code>
+                </div>
+                {segment.filePath ? (
+                  <p className="review-path-meta">
+                    <code>{segment.filePath}</code>
+                    {segment.sourceLine ? `:${segment.sourceLine}` : ""}
+                  </p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+          <p className="diagnostic-path-empty">{path.note}</p>
+        </>
+      )}
+    </section>
   );
 }
 

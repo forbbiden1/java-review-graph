@@ -210,6 +210,23 @@ public class ProjectController {
                 .toList();
     }
 
+    @GetMapping("/{projectId}/symbols/path")
+    public SymbolPathResponse findSymbolPath(
+            @PathVariable("projectId") String projectId,
+            @RequestParam(name = "snapshotId", required = false) String snapshotId,
+            @RequestParam("sourceSymbolKey") String sourceSymbolKey,
+            @RequestParam("targetSymbolKey") String targetSymbolKey,
+            @RequestParam(name = "maxDepth", defaultValue = "4") int maxDepth
+    ) {
+        return SymbolPathResponse.from(reviewQueryService.findSymbolPath(
+                projectId,
+                snapshotId,
+                sourceSymbolKey,
+                targetSymbolKey,
+                maxDepth
+        ));
+    }
+
     @GetMapping("/{projectId}/classes/{classId}/method-graph")
     public MethodGraphResponse getMethodGraph(
             @PathVariable("projectId") String projectId,

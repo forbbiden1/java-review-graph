@@ -203,6 +203,20 @@ Current behavior:
 - returns persisted `added`, `modified_api`, `modified_impl`, `impacted`, and `deleted` entries for the selected snapshot
 - `impacted` is derived with one-hop propagation from changed or deleted neighbors
 
+### Query symbol path
+
+`GET /api/projects/{projectId}/symbols/path?snapshotId={snapshotId}&sourceSymbolKey={sourceSymbolKey}&targetSymbolKey={targetSymbolKey}&maxDepth=4`
+
+Current behavior:
+
+- resolves `snapshotId` to the latest snapshot when omitted
+- requires `sourceSymbolKey` and `targetSymbolKey`
+- bounds `maxDepth` between `1` and `8`, defaulting to `4`
+- searches stored `extends`, `implements`, `uses_type`, `calls`, and `overrides` relations as an undirected review trace
+- returns the shortest found path with ordered symbol nodes and ordered relation segments
+- lower-cases `relationType` in the API response for frontend display consistency
+- returns `found = false` and an explanatory `note` when either symbol is absent or no path exists within the depth limit
+
 ### Review one change set
 
 `POST /api/projects/{projectId}/review/change-set`

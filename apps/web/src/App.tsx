@@ -2,6 +2,7 @@ import { type FormEvent, lazy, type MouseEvent as ReactMouseEvent, Suspense, use
 import {
   compareSnapshots,
   exportChangeSetReviewMarkdown,
+  findSymbolPath,
   type ClassGraph,
   type ChangeSetReviewMarkdownReport,
   type ChangeSetReviewPayload,
@@ -25,7 +26,8 @@ import {
   type Project,
   type ProjectSnapshot,
   type SnapshotDiagnostics,
-  type SymbolChange
+  type SymbolChange,
+  type SymbolPathResult
 } from "./api/client";
 import {
   ChangeList,
@@ -116,6 +118,8 @@ function App() {
   const [reviewBaseCommit, setReviewBaseCommit] = useState("");
   const [reviewTargetCommit, setReviewTargetCommit] = useState("");
   const [reviewResult, setReviewResult] = useState<ChangeSetReviewResult | null>(null);
+  const [symbolPathResult, setSymbolPathResult] = useState<SymbolPathResult | null>(null);
+  const [loadingSymbolPath, setLoadingSymbolPath] = useState(false);
   const [reviewMarkdownReport, setReviewMarkdownReport] = useState<ChangeSetReviewMarkdownReport | null>(null);
   const [snapshotCompareBaseId, setSnapshotCompareBaseId] = useState("");
   const [snapshotCompareResult, setSnapshotCompareResult] = useState<SnapshotCompareResult | null>(null);
@@ -351,6 +355,8 @@ function App() {
       setChanges(changeList);
       setSnapshotDiagnostics(diagnostics);
       setSelectedSnapshotId(graph.snapshotId);
+      setSymbolPathResult(null);
+      setLoadingSymbolPath(false);
       setWorkspaceMessage(
         workspaceMessageOverride ??
           activeCopy.messages.snapshotLoaded(shortId(graph.snapshotId), graph.nodes.length, graph.edges.length, changeList.length)
@@ -524,12 +530,37 @@ function App() {
     try {
       const result = await reviewChangeSet(selectedProjectId, buildChangeSetReviewPayload(selectedSnapshotId));
       setReviewResult(result);
+      await loadImpactTrace(selectedProjectId, result);
       setReviewMarkdownReport(null);
       setWorkspaceMessage(copy.messages.reviewFinished(result.risk.level, result.reviewTargets.length));
     } catch (error) {
       setErrorMessage(toMessage(error, copy.messages.unexpectedError));
     } finally {
       setSubmittingReview(false);
+    }
+  }
+
+  async function loadImpactTrace(projectId: string, result: ChangeSetReviewResult) {
+    const sourceSymbol = result.changedSymbols[0] ?? null;
+    const targetSymbol = result.impactedSymbols[0] ?? null;
+    if (!sourceSymbol || !targetSymbol) {
+      setSymbolPathResult(null);
+      return;
+    }
+
+    setLoadingSymbolPath(true);
+    try {
+      const pathResult = await findSymbolPath(projectId, {
+        snapshotId: result.snapshotId,
+        sourceSymbolKey: sourceSymbol.symbolKey,
+        targetSymbolKey: targetSymbol.symbolKey,
+        maxDepth: 4
+      });
+      setSymbolPathResult(pathResult);
+    } catch {
+      setSymbolPathResult(null);
+    } finally {
+      setLoadingSymbolPath(false);
     }
   }
 
@@ -887,6 +918,8 @@ function App() {
     setMethodGraph(null);
     setChanges([]);
     setReviewResult(null);
+    setSymbolPathResult(null);
+    setLoadingSymbolPath(false);
     setReviewMarkdownReport(null);
     setSnapshotCompareResult(null);
     setSelectedClassId(null);
@@ -1313,6 +1346,8 @@ function App() {
                     markdownLabel={copy.copy.reviewMarkdownLabel}
                     report={reviewMarkdownReport}
                     result={reviewResult}
+                    symbolPath={symbolPathResult}
+                    symbolPathLoading={loadingSymbolPath}
                     reviewTargetsLabel={copy.copy.reviewTargetsLabel}
                     reviewSourceLabel={copy.fields.reviewSource}
                     reviewSourceValue={reviewChangeSource}

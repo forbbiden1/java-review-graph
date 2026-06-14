@@ -135,6 +135,33 @@ export type ChangeSetReviewResult = {
   summary: string;
 };
 
+export type SymbolPathNode = {
+  symbolKey: string;
+  qualifiedName: string;
+  displayName: string;
+  kind: string;
+  status: string;
+};
+
+export type SymbolPathSegment = {
+  sourceSymbolKey: string;
+  targetSymbolKey: string;
+  relationType: string;
+  filePath: string | null;
+  sourceLine: number | null;
+};
+
+export type SymbolPathResult = {
+  snapshotId: string;
+  sourceSymbolKey: string;
+  targetSymbolKey: string;
+  maxDepth: number;
+  found: boolean;
+  nodes: SymbolPathNode[];
+  segments: SymbolPathSegment[];
+  note: string;
+};
+
 export type ChangeSetReviewMarkdownReport = {
   fileName: string;
   markdown: string;
@@ -353,6 +380,26 @@ export function getChanges(projectId: string, snapshotId?: string | null) {
   const query = params.toString();
   const suffix = query ? `?${query}` : "";
   return request<SymbolChange[]>(`/api/projects/${encodeURIComponent(projectId)}/changes${suffix}`);
+}
+
+export function findSymbolPath(
+  projectId: string,
+  payload: {
+    snapshotId?: string | null;
+    sourceSymbolKey: string;
+    targetSymbolKey: string;
+    maxDepth?: number;
+  }
+) {
+  const params = new URLSearchParams({
+    sourceSymbolKey: payload.sourceSymbolKey,
+    targetSymbolKey: payload.targetSymbolKey,
+    maxDepth: String(payload.maxDepth ?? 4)
+  });
+  if (payload.snapshotId) {
+    params.set("snapshotId", payload.snapshotId);
+  }
+  return request<SymbolPathResult>(`/api/projects/${encodeURIComponent(projectId)}/symbols/path?${params.toString()}`);
 }
 
 export function getMethodGraph(projectId: string, classId: string, snapshotId?: string | null) {

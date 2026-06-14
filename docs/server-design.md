@@ -85,12 +85,14 @@ Current query-path behavior:
 
 - class graph reads only `EXTENDS`, `IMPLEMENTS`, and `USES_TYPE` relations for the selected snapshot, then trims to indexed type-to-type edges
 - method graph reads only `CALLS` relations whose source and target both belong to the selected class methods
+- symbol path queries run bounded BFS over persisted `EXTENDS`, `IMPLEMENTS`, `USES_TYPE`, `CALLS`, and `OVERRIDES` relations to explain review-relevant traces between two symbols
 - change-set review reads one snapshot plus one Git, manual, or explicit `baseCommit -> targetCommit` changed-file set, then maps file paths to changed symbols and persisted impacted symbols
 - explicit commit-range review uses committed Git diff output only, including rename pairs, and does not include uncommitted workspace edits
 - change-set review also derives a deterministic risk summary from changed statuses, impacted count, and deleted-symbol signals
 - the risk summary now keeps both plain-language reasons and structured factors with rule codes, score contribution, severity, and evidence
 - change-set review can also render one export-ready Markdown report without introducing AI or non-deterministic scoring
 - change-set review also exposes direct propagation paths between changed and impacted symbols from stored graph relations
+- the UI can also call the symbol path query after review to show a bounded multi-hop impact trace without changing the deterministic review result payload
 - change-set review also derives deterministic test-focus suggestions from changed APIs, impacted symbols, and propagation paths
 - snapshot compare reads two persisted symbol sets and structural relation sets by snapshot id, then reports symbol and relation evolution without invoking AI or recomputing source analysis
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough

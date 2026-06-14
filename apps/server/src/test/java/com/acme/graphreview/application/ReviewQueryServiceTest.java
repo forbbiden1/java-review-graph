@@ -1,6 +1,7 @@
 package com.acme.graphreview.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.acme.graphreview.domain.ProjectSnapshot;
@@ -104,6 +105,108 @@ class ReviewQueryServiceTest {
 
         assertTrue(edges.isEmpty());
         assertEquals(0, relationRepository.symbolKeyQueryCount);
+    }
+
+    @Test
+    void findSymbolPathReturnsShortestTraceWithTraversalDirection() {
+        RegisteredProject project = project();
+        ProjectSnapshot snapshot = snapshot(project.id());
+        SymbolRecord controllerType = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller");
+        SymbolRecord serviceType = typeSymbol("type:root:demo.Service", "demo.Service", "Service");
+        SymbolRecord repositoryType = typeSymbol("type:root:demo.Repository", "demo.Repository", "Repository");
+
+        CapturingSymbolRepository symbolRepository = new CapturingSymbolRepository(
+                List.of(controllerType, serviceType, repositoryType),
+                Map.of()
+        );
+        CapturingRelationRepository relationRepository = new CapturingRelationRepository();
+        RelationRecord controllerUsesService = relation(controllerType.symbolKey(), serviceType.symbolKey(), RelationType.USES_TYPE);
+        RelationRecord repositoryUsedByService = relation(repositoryType.symbolKey(), serviceType.symbolKey(), RelationType.USES_TYPE);
+        relationRepository.typeQueryResult = List.of(controllerUsesService, repositoryUsedByService);
+
+        ReviewQueryService service = new ReviewQueryService(
+                new StubProjectService(project),
+                new InMemorySnapshotRepository(snapshot),
+                symbolRepository,
+                relationRepository,
+                new NoOpSymbolChangeRepository()
+        );
+
+        var result = service.findSymbolPath(project.id(), snapshot.id(), controllerType.symbolKey(), repositoryType.symbolKey(), 4);
+
+        assertTrue(result.found());
+        assertEquals(snapshot.id(), result.snapshotId());
+        assertEquals(4, result.maxDepth());
+        assertEquals(
+                List.of(controllerType.symbolKey(), serviceType.symbolKey(), repositoryType.symbolKey()),
+                result.nodes().stream().map(ReviewQueryService.SymbolPathNode::symbolKey).toList()
+        );
+        assertEquals(2, result.segments().size());
+        assertEquals(controllerType.symbolKey(), result.segments().get(0).sourceSymbolKey());
+        assertEquals(serviceType.symbolKey(), result.segments().get(0).targetSymbolKey());
+        assertEquals(serviceType.symbolKey(), result.segments().get(1).sourceSymbolKey());
+        assertEquals(repositoryType.symbolKey(), result.segments().get(1).targetSymbolKey());
+        assertEquals(
+                List.of(RelationType.EXTENDS, RelationType.IMPLEMENTS, RelationType.USES_TYPE, RelationType.CALLS, RelationType.OVERRIDES),
+                relationRepository.lastTypes
+        );
+    }
+
+    @Test
+    void findSymbolPathRespectsDepthLimit() {
+        RegisteredProject project = project();
+        ProjectSnapshot snapshot = snapshot(project.id());
+        SymbolRecord controllerType = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller");
+        SymbolRecord serviceType = typeSymbol("type:root:demo.Service", "demo.Service", "Service");
+        SymbolRecord repositoryType = typeSymbol("type:root:demo.Repository", "demo.Repository", "Repository");
+
+        CapturingSymbolRepository symbolRepository = new CapturingSymbolRepository(
+                List.of(controllerType, serviceType, repositoryType),
+                Map.of()
+        );
+        CapturingRelationRepository relationRepository = new CapturingRelationRepository();
+        relationRepository.typeQueryResult = List.of(
+                relation(controllerType.symbolKey(), serviceType.symbolKey(), RelationType.USES_TYPE),
+                relation(serviceType.symbolKey(), repositoryType.symbolKey(), RelationType.CALLS)
+        );
+
+        ReviewQueryService service = new ReviewQueryService(
+                new StubProjectService(project),
+                new InMemorySnapshotRepository(snapshot),
+                symbolRepository,
+                relationRepository,
+                new NoOpSymbolChangeRepository()
+        );
+
+        var result = service.findSymbolPath(project.id(), snapshot.id(), controllerType.symbolKey(), repositoryType.symbolKey(), 1);
+
+        assertFalse(result.found());
+        assertTrue(result.nodes().isEmpty());
+        assertTrue(result.segments().isEmpty());
+    }
+
+    @Test
+    void findSymbolPathReturnsNotFoundForSymbolsOutsideSnapshot() {
+        RegisteredProject project = project();
+        ProjectSnapshot snapshot = snapshot(project.id());
+        SymbolRecord controllerType = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller");
+
+        CapturingSymbolRepository symbolRepository = new CapturingSymbolRepository(List.of(controllerType), Map.of());
+        CapturingRelationRepository relationRepository = new CapturingRelationRepository();
+
+        ReviewQueryService service = new ReviewQueryService(
+                new StubProjectService(project),
+                new InMemorySnapshotRepository(snapshot),
+                symbolRepository,
+                relationRepository,
+                new NoOpSymbolChangeRepository()
+        );
+
+        var result = service.findSymbolPath(project.id(), snapshot.id(), controllerType.symbolKey(), "type:root:demo.Missing", 4);
+
+        assertFalse(result.found());
+        assertEquals(0, relationRepository.lastTypes.size());
+        assertTrue(result.note().contains("not present"));
     }
 
     private static RegisteredProject project() {
@@ -246,7 +349,10 @@ class ReviewQueryServiceTest {
 
         @Override
         public List<SymbolRecord> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
-            return List.of();
+            return java.util.stream.Stream.concat(
+                    typeSymbols.stream(),
+                    methodsByParentSymbolKey.values().stream().flatMap(List::stream)
+            ).toList();
         }
 
         @Override

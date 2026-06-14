@@ -25,6 +25,7 @@ import {
 } from "@xyflow/react";
 import type { GraphEdge, GraphNode } from "../api/client";
 import { clearGraphScene, loadGraphScene, saveGraphScene } from "../platform";
+import { buildProgressiveGraph } from "./graph-density";
 import { buildElkLayout, buildScopedGraph, nodeStatusColor } from "./graph-layout";
 import {
   DEFAULT_VIEWPORT,
@@ -63,6 +64,9 @@ type GraphCanvasProps = {
     instructions: string;
     isolateHint: string;
     reset: string;
+    preview: (visibleCount: number, hiddenCount: number) => string;
+    showAll: string;
+    showPreview: string;
     scopeConnected: string;
     scopeDirect: string;
     viewportEmptyBody: string;
@@ -135,10 +139,15 @@ function GraphCanvasInner({
   const [flowEdges, setFlowEdges] = useState<FlowEdge[]>([]);
   const [stageSize, setStageSize] = useState<StageSize>({ height: 0, width: 0 });
   const [layoutResult, setLayoutResult] = useState<LayoutResult | null>(null);
+  const [showFullGraph, setShowFullGraph] = useState(false);
   const [isViewportActive, setIsViewportActive] = useState(false);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const reactFlow = useReactFlow<FlowNode, FlowEdge>();
   const { nodeOverrides, scopedNodeId, scopeMode, viewport } = graphViewState;
+  const progressiveGraph = useMemo(
+    () => buildProgressiveGraph(nodes, edges, selectedNodeId, showFullGraph || Boolean(scopedNodeId)),
+    [edges, nodes, scopedNodeId, selectedNodeId, showFullGraph]
+  );
 
   useEffect(() => {
     flowNodesRef.current = flowNodes;
@@ -178,7 +187,7 @@ function GraphCanvasInner({
     }
 
     const storedScene = loadGraphScene(sceneStorageKey);
-    const availableNodeIds = new Set(nodes.map((node) => node.id));
+    const availableNodeIds = new Set(progressiveGraph.nodes.map((node) => node.id));
     const nextState = createGraphViewStateFromScene(storedScene, availableNodeIds);
 
     restoredSceneKeyRef.current = storedScene ? sceneStorageKey ?? null : null;
@@ -187,12 +196,12 @@ function GraphCanvasInner({
     sceneHydratedRef.current = true;
     dispatchGraphView({ state: nextState, type: "restoreScene" });
     applyViewport(nextState.viewport);
-  }, [sceneStorageKey, nodes]);
+  }, [progressiveGraph.nodes, sceneStorageKey]);
 
   useEffect(() => {
-    const currentNodeIds = new Set(nodes.map((node) => node.id));
+    const currentNodeIds = new Set(progressiveGraph.nodes.map((node) => node.id));
     dispatchGraphView({ availableNodeIds: currentNodeIds, type: "syncAvailableNodes" });
-  }, [nodes]);
+  }, [progressiveGraph.nodes]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -213,7 +222,16 @@ function GraphCanvasInner({
     return () => observer.disconnect();
   }, []);
 
-  const scopedGraph = useMemo(() => buildScopedGraph(nodes, edges, scopedNodeId, scopeMode), [edges, nodes, scopedNodeId, scopeMode]);
+  const scopedGraph = useMemo(
+    () => buildScopedGraph(progressiveGraph.nodes, progressiveGraph.edges, scopedNodeId, scopeMode),
+    [progressiveGraph.edges, progressiveGraph.nodes, scopedNodeId, scopeMode]
+  );
+
+  useEffect(() => {
+    restoredSceneKeyRef.current = null;
+    initializedSceneKeyRef.current = null;
+    previousScopeSignatureRef.current = null;
+  }, [showFullGraph]);
 
   useEffect(() => {
     if (!sceneHydratedRef.current) {
@@ -461,9 +479,17 @@ function GraphCanvasInner({
     <div className={`graph-shell ${immersive ? "is-immersive" : ""}`}>
       <div className="graph-tools">
         <div className="graph-chip">{labels.visible(visibleCount, totalCount)}</div>
+        {progressiveGraph.isLimited ? (
+          <div className="graph-chip graph-chip-preview">{labels.preview(progressiveGraph.nodes.length, progressiveGraph.hiddenNodeCount)}</div>
+        ) : null}
         <div className="graph-chip graph-chip-focus">{focusedNode ? labels.focused(focusedNode.name) : labels.isolateHint}</div>
         <div className="graph-chip">{labels.instructions}</div>
         <div className="graph-tool-actions">
+          {progressiveGraph.isLimited || showFullGraph ? (
+            <button type="button" onClick={() => setShowFullGraph((currentValue) => !currentValue)}>
+              {showFullGraph ? labels.showPreview : labels.showAll}
+            </button>
+          ) : null}
           <div className="graph-scope-toggle" role="tablist" aria-label={labels.isolateHint}>
             <button
               type="button"

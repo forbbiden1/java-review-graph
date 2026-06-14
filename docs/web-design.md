@@ -79,6 +79,7 @@ Current implementation notes:
 - `GraphCanvas.tsx` now focuses on canvas orchestration; graph model types, ELK layout, viewport math, scene helpers, and node or edge renderers live in separate `src/graph/*` modules
 - persistent graph view transitions now go through a reducer, so scope changes, node position overrides, scene restore, reset, and viewport updates share one predictable state path
 - snapshot history now renders commit-grouped sections through a dedicated component and reveals long groups incrementally, which keeps the sidebar responsive when one project accumulates many snapshots
+- large graphs now start in a progressive preview mode that keeps high-signal nodes first and lets the user switch to the full graph on demand, reducing initial layout pressure for very large snapshots
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing

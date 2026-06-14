@@ -49,7 +49,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when graph-heavy screens are lazy-loaded and the main entry chunk warning is reduced or eliminated.
 - [ ] Virtualize long snapshot and change lists.
   Done when very large histories remain responsive.
-- [ ] Improve large-graph rendering strategy.
+- [x] Improve large-graph rendering strategy.
   Candidates: progressive node reveal, edge simplification, staged layout, and viewport-based rendering.
 - [x] Add an indexing diagnostics panel in the UI.
   Done when users can inspect snapshot source, changed files, fallback reasons, and rebuild scope without reading logs.

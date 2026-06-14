@@ -131,11 +131,14 @@ export type AppCopy = {
     instructions: string;
     isolateHint: string;
     reset: string;
+    showAll: string;
+    showPreview: string;
     scopeConnected: string;
     scopeDirect: string;
     viewportEmptyBody: string;
     viewportEmptyTitle: string;
     visible: (visibleCount: number, totalCount: number) => string;
+    preview: (visibleCount: number, hiddenCount: number) => string;
     zoom: (zoomPercent: number) => string;
     zoomIn: string;
     zoomOut: string;
@@ -293,11 +296,14 @@ const EN_COPY: AppCopy = {
     instructions: "Hover or focus graph | Scroll to zoom | Drag to explore | Double-click to isolate",
     isolateHint: "Double-click a node to isolate related nodes",
     reset: "Reset",
+    showAll: "Show full graph",
+    showPreview: "Preview mode",
     scopeConnected: "Direct + indirect",
     scopeDirect: "Direct only",
     viewportEmptyBody: "Drag back toward the cluster or reset the camera.",
     viewportEmptyTitle: "No nodes in this viewport.",
     visible: (visibleCount, totalCount) => `Visible ${visibleCount}/${totalCount}`,
+    preview: (visibleCount, hiddenCount) => `Preview ${visibleCount} nodes | ${hiddenCount} hidden`,
     zoom: (zoomPercent) => `Zoom ${zoomPercent}%`,
     zoomIn: "Zoom in",
     zoomOut: "Zoom out"
@@ -433,11 +439,14 @@ const ZH_COPY = {
     instructions: "鼠标悬停或聚焦画布 | 滚轮缩放 | 拖动查看局部 | 双击节点隔离关联图",
     isolateHint: "双击节点后只查看与它相关的节点和关系",
     reset: "重置视图",
+    showAll: "显示全量图",
+    showPreview: "预览模式",
     scopeConnected: "直接 + 间接",
     scopeDirect: "仅直接关系",
     viewportEmptyBody: "把画布拖回主聚簇附近，或直接重置视角。",
     viewportEmptyTitle: "当前视口没有节点。",
     visible: (visibleCount, totalCount) => `可见 ${visibleCount}/${totalCount}`,
+    preview: (visibleCount, hiddenCount) => `预览 ${visibleCount} 个节点 | 隐藏 ${hiddenCount} 个`,
     zoom: (zoomPercent) => `缩放 ${zoomPercent}%`,
     zoomIn: "放大",
     zoomOut: "缩小"

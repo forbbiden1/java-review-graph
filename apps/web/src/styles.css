@@ -1028,6 +1028,12 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+.graph-chip-preview {
+  border-color: rgba(188, 76, 0, 0.18);
+  background: rgba(188, 76, 0, 0.08);
+  color: #9a4a00;
+}
+
 .graph-tool-actions {
   display: inline-flex;
   align-items: center;

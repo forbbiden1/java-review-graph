@@ -333,23 +333,82 @@ export function SnapshotComparePanel({
             <h3>{language === "zh" ? "快照差异摘要" : "Snapshot Diff Summary"}</h3>
             <p>{compareResult.note}</p>
           </article>
-          <div className="list-stack">
-            {compareResult.changes.slice(0, 8).map((change) => (
-              <article key={`${change.changeType}:${change.symbolKey}`} className={`change-card status-${change.changeType}`}>
-                <div className="change-head">
-                  <span className={`status-pill status-${change.changeType}`}>{formatStatusLabel(change.changeType, language)}</span>
-                  <code>{compactSymbolKey(change.symbolKey)}</code>
-                </div>
-                <strong>{change.displayName}</strong>
-                <p>{change.qualifiedName}</p>
-                {change.filePath ? (
-                  <p className="review-path-meta">
-                    <code>{change.filePath}</code>
-                  </p>
-                ) : null}
-              </article>
-            ))}
+          <div className="snapshot-compare-summary">
+            <DiagnosticFact
+              label={language === "zh" ? "关系新增" : "Relation Added"}
+              value={String(compareResult.relationSummary.added)}
+            />
+            <DiagnosticFact
+              label={language === "zh" ? "关系删除" : "Relation Deleted"}
+              value={String(compareResult.relationSummary.deleted)}
+            />
+            <DiagnosticFact
+              label={language === "zh" ? "关系总数" : "Relations"}
+              value={String(compareResult.relationSummary.totalComparedRelations)}
+            />
+            <DiagnosticFact
+              label={language === "zh" ? "关系变更" : "Relation Changed"}
+              value={String(compareResult.relationSummary.changed)}
+            />
           </div>
+          <section className="review-report-section">
+            <div className="diagnostic-path-header">
+              <strong>{language === "zh" ? "符号变化" : "Symbol Changes"}</strong>
+              <span>{compareResult.changes.length}</span>
+            </div>
+            <div className="list-stack">
+              {compareResult.changes.slice(0, 8).map((change) => (
+                <article key={`${change.changeType}:${change.symbolKey}`} className={`change-card status-${change.changeType}`}>
+                  <div className="change-head">
+                    <span className={`status-pill status-${change.changeType}`}>{formatStatusLabel(change.changeType, language)}</span>
+                    <code>{compactSymbolKey(change.symbolKey)}</code>
+                  </div>
+                  <strong>{change.displayName}</strong>
+                  <p>{change.qualifiedName}</p>
+                  {change.filePath ? (
+                    <p className="review-path-meta">
+                      <code>{change.filePath}</code>
+                    </p>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+          <section className="review-report-section">
+            <div className="diagnostic-path-header">
+              <strong>{language === "zh" ? "关系演进" : "Relation Evolution"}</strong>
+              <span>{compareResult.relationChanges.length}</span>
+            </div>
+            {compareResult.relationChanges.length === 0 ? (
+              <p className="diagnostic-path-empty">{language === "zh" ? "没有结构关系变化" : "No structural relation changes"}</p>
+            ) : (
+              <div className="list-stack">
+                {compareResult.relationChanges.slice(0, 8).map((change) => (
+                  <article
+                    key={`${change.changeType}:${change.relationType}:${change.sourceSymbolKey}:${change.targetSymbolKey}`}
+                    className={`change-card status-${change.changeType}`}
+                  >
+                    <div className="change-head">
+                      <span className={`status-pill status-${change.changeType}`}>{formatStatusLabel(change.changeType, language)}</span>
+                      <span className="status-pill status-impacted">{formatEdgeTypeLabel(change.relationType, language)}</span>
+                    </div>
+                    <strong>
+                      {change.sourceDisplayName} -&gt; {change.targetDisplayName}
+                    </strong>
+                    <p>
+                      {change.sourceQualifiedName} -&gt; {change.targetQualifiedName}
+                    </p>
+                    {change.filePath ? (
+                      <p className="review-path-meta">
+                        <code>{change.filePath}</code>
+                        {change.sourceLine ? `:${change.sourceLine}` : ""}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       ) : null}
     </div>

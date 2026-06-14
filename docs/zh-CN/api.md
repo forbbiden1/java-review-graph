@@ -90,7 +90,7 @@
 
 ## `GET /api/projects/{projectId}/snapshots/compare?baseSnapshotId={baseSnapshotId}&targetSnapshotId={targetSnapshotId}`
 
-对比两个持久化快照的符号级差异。
+对比两个持久化快照的符号和结构关系差异。
 
 当前行为：
 
@@ -98,7 +98,9 @@
 - 不允许用同一个快照 id 同时作为基线和目标
 - 按 `symbolKey` 对比两个快照中的持久化符号
 - 基于符号存在性以及 `apiHash` / `implHash`，确定性产出 `added`、`deleted`、`modified_api`、`modified_impl`
-- 返回摘要统计和逐符号差异列表，供前端直接展示
+- 还会按 `source_symbol_key`、`target_symbol_key`、`relation_type` 对比持久化结构关系
+- 当前结构关系对比范围包括 `extends`、`implements`、`uses_type`、`calls`、`overrides`，不包含仅用于声明归属的边
+- 返回符号摘要、逐符号差异、关系摘要、逐关系差异，供前端直接展示
 
 ## `PATCH /api/projects/{projectId}/snapshots/{snapshotId}`
 

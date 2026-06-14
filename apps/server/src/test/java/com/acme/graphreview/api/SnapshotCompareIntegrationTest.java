@@ -44,6 +44,13 @@ class SnapshotCompareIntegrationTest {
         insertSymbol(projectId, targetSnapshotId, "file-target-service", "type:demo.Service", "Service", "demo.Service", "api-service-v2", "impl-service-v2");
         insertSymbol(projectId, targetSnapshotId, "file-target-repo", "type:demo.Repository", "Repository", "demo.Repository", "api-repository-v1", "impl-repository-v1");
 
+        insertRelation(projectId, baseSnapshotId, "type:demo.Service", "type:demo.Controller", "uses_type", "file-base-service", 8);
+        insertRelation(projectId, baseSnapshotId, "type:demo.Controller", "type:demo.Service", "uses_type", "file-base-controller", 12);
+        insertRelation(projectId, baseSnapshotId, "type:demo.Service", "method:demo.Service.save()", "declares", "file-base-service", 3);
+        insertRelation(projectId, targetSnapshotId, "type:demo.Service", "type:demo.Controller", "uses_type", "file-target-service", 8);
+        insertRelation(projectId, targetSnapshotId, "type:demo.Service", "type:demo.Repository", "uses_type", "file-target-service", 14);
+        insertRelation(projectId, targetSnapshotId, "type:demo.Repository", "method:demo.Repository.save()", "declares", "file-target-repo", 3);
+
         mockMvc.perform(get("/api/projects/{projectId}/snapshots/compare", projectId)
                         .param("baseSnapshotId", baseSnapshotId)
                         .param("targetSnapshotId", targetSnapshotId))
@@ -61,7 +68,17 @@ class SnapshotCompareIntegrationTest {
                 .andExpect(jsonPath("$.summary.changed").value(3))
                 .andExpect(jsonPath("$.changes[?(@.symbolKey=='type:demo.Repository')].changeType").value("added"))
                 .andExpect(jsonPath("$.changes[?(@.symbolKey=='type:demo.Controller')].changeType").value("deleted"))
-                .andExpect(jsonPath("$.changes[?(@.symbolKey=='type:demo.Service')].changeType").value("modified_api"));
+                .andExpect(jsonPath("$.changes[?(@.symbolKey=='type:demo.Service')].changeType").value("modified_api"))
+                .andExpect(jsonPath("$.relationSummary.baseRelationCount").value(2))
+                .andExpect(jsonPath("$.relationSummary.targetRelationCount").value(2))
+                .andExpect(jsonPath("$.relationSummary.totalComparedRelations").value(3))
+                .andExpect(jsonPath("$.relationSummary.added").value(1))
+                .andExpect(jsonPath("$.relationSummary.deleted").value(1))
+                .andExpect(jsonPath("$.relationSummary.unchanged").value(1))
+                .andExpect(jsonPath("$.relationSummary.changed").value(2))
+                .andExpect(jsonPath("$.relationChanges[?(@.targetSymbolKey=='type:demo.Repository')].changeType").value("added"))
+                .andExpect(jsonPath("$.relationChanges[?(@.sourceSymbolKey=='type:demo.Controller')].changeType").value("deleted"))
+                .andExpect(jsonPath("$.relationChanges[?(@.relationType=='declares')]").doesNotExist());
     }
 
     private void insertProject(String projectId, String now) {
@@ -157,6 +174,36 @@ class SnapshotCompareIntegrationTest {
                 apiHash,
                 implHash,
                 "unchanged",
+                null
+        );
+    }
+
+    private void insertRelation(
+            String projectId,
+            String snapshotId,
+            String sourceSymbolKey,
+            String targetSymbolKey,
+            String relationType,
+            String fileId,
+            int sourceLine
+    ) {
+        jdbcTemplate.update(
+                """
+                insert into relation (
+                    id, project_id, snapshot_id, source_symbol_key, target_symbol_key, relation_type,
+                    confidence, source_file_id, source_line, metadata_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                "relation-" + snapshotId + "-" + sourceSymbolKey + "-" + targetSymbolKey + "-" + relationType,
+                projectId,
+                snapshotId,
+                sourceSymbolKey,
+                targetSymbolKey,
+                relationType,
+                "exact",
+                fileId,
+                sourceLine,
                 null
         );
     }

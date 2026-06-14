@@ -72,5 +72,5 @@
 - 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告
 - change-set review 面板现在还会展示直接传播路径，帮助解释为什么某一个变更会影响下游 review 目标
 - 同一个面板现在还会给出确定性的测试关注建议，让演示可以自然落到具体回归或集成测试目标
-- 同一个右侧检查区现在也支持 snapshot-to-snapshot compare，可先选择一个基线快照，再查看与当前快照之间的确定性符号差异
+- 同一个右侧检查区现在也支持 snapshot-to-snapshot compare，可先选择一个基线快照，再查看与当前快照之间的确定性符号差异和结构关系演进
 - `App.tsx` 现在只保留工作区状态与流程编排；通用面板组件拆到 `src/app/components.tsx`，图谱、快照与 review 展示相关的纯工具函数拆到 `src/app/utils.ts`

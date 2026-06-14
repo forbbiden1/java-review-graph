@@ -66,8 +66,8 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when one analysis run can be exported as a shareable review summary.
 - [x] Add historical snapshot comparison.
   Done for symbol-level evolution when two snapshots can show added, deleted, API-modified, and implementation-modified symbols side by side.
-- [ ] Add relation evolution to historical snapshot comparison.
-  Done when dependency and call relation additions, deletions, and changes can be inspected alongside symbol changes.
+- [x] Add relation evolution to historical snapshot comparison.
+  Done when dependency and call relation additions and deletions can be inspected alongside symbol changes.
 - [ ] Add AI-assisted review explanation.
   Done when graph-derived evidence can be summarized into readable review notes and test suggestions.
 

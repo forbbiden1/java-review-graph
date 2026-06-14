@@ -161,12 +161,38 @@ export type SnapshotCompareChange = {
   reason: string;
 };
 
+export type SnapshotCompareRelationSummary = {
+  baseRelationCount: number;
+  targetRelationCount: number;
+  totalComparedRelations: number;
+  added: number;
+  deleted: number;
+  unchanged: number;
+  changed: number;
+};
+
+export type SnapshotCompareRelationChange = {
+  sourceSymbolKey: string;
+  sourceDisplayName: string;
+  sourceQualifiedName: string;
+  targetSymbolKey: string;
+  targetDisplayName: string;
+  targetQualifiedName: string;
+  relationType: string;
+  filePath: string | null;
+  sourceLine: number | null;
+  changeType: string;
+  reason: string;
+};
+
 export type SnapshotCompareResult = {
   projectId: string;
   baseSnapshot: SnapshotCompareRef;
   targetSnapshot: SnapshotCompareRef;
   summary: SnapshotCompareSummary;
   changes: SnapshotCompareChange[];
+  relationSummary: SnapshotCompareRelationSummary;
+  relationChanges: SnapshotCompareRelationChange[];
   note: string;
 };
 

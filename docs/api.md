@@ -139,7 +139,9 @@ Current behavior:
 - rejects requests that compare the same snapshot id on both sides
 - loads persisted symbol rows from both snapshots and compares them by `symbolKey`
 - reports `added`, `deleted`, `modified_api`, and `modified_impl` deterministically from symbol existence plus `apiHash` / `implHash`
-- returns a summary count block and a per-symbol diff list for UI inspection
+- also compares persisted structural relations by `source_symbol_key`, `target_symbol_key`, and `relation_type`
+- limits relation evolution to `extends`, `implements`, `uses_type`, `calls`, and `overrides`, excluding declaration-only edges
+- returns symbol summary and symbol diff rows plus relation summary and relation diff rows for UI inspection
 
 ### Rename one snapshot
 

@@ -78,5 +78,5 @@ Current implementation notes:
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
 - the change-set review panel also shows direct propagation paths so users can explain why one changed symbol affects a downstream review target
 - the same panel now highlights deterministic test-focus suggestions so the demo can end with concrete regression or integration targets
-- the same inspector now also supports snapshot-to-snapshot compare, so users can choose a baseline snapshot and inspect deterministic symbol diffs before running review
+- the same inspector now also supports snapshot-to-snapshot compare, so users can choose a baseline snapshot and inspect deterministic symbol diffs plus structural relation evolution before running review
 - `App.tsx` is now limited to workspace state and orchestration; shared panels live in `src/app/components.tsx`, while graph, snapshot, and review display helpers live in `src/app/utils.ts`

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useState } from "react";
 import type {
   ChangeSetReviewMarkdownReport,
   ChangeSetReviewResult,
@@ -9,7 +9,7 @@ import type {
 } from "../api/client";
 import { formatEdgeTypeLabel, formatStatusLabel } from "../i18n";
 import type { LanguageMode } from "../platform";
-import type { IndexChangeSource, SnapshotDiagnosticsCopy } from "./view-model";
+import type { IndexChangeSource, SnapshotDiagnosticsCopy, SnapshotGroup } from "./view-model";
 import {
   buildChangeFilterOptions,
   compactSymbolKey,
@@ -19,10 +19,13 @@ import {
   getAllChangeFilterLabel,
   groupSymbolChanges,
   normalizeRiskStatusClass,
+  resolveSnapshotDisplayName,
   shortId
 } from "./utils";
 
 const CHANGE_PAGE_SIZE = 6;
+const SNAPSHOT_GROUP_INITIAL_COUNT = 12;
+const SNAPSHOT_GROUP_INCREMENT = 12;
 
 export type PanelProps = {
   actions?: ReactNode;
@@ -148,6 +151,179 @@ export function ChangeList({ changes, emptyBody, emptyTitle, language }: ChangeL
             <p>{change.reason}</p>
           </article>
         ))}
+      </div>
+    </div>
+  );
+}
+
+type SnapshotHistoryListProps = {
+  collapsedGroupKeys: string[];
+  emptyBody: string;
+  emptyTitle: string;
+  language: LanguageMode;
+  locale: string;
+  onCollapseGroupToggle: (groupKey: string) => void;
+  onOpenSnapshot: (snapshot: ProjectSnapshot) => void;
+  onRenameCancel: () => void;
+  onRenameDraftChange: (value: string) => void;
+  onRenameSnapshot: (snapshot: ProjectSnapshot) => void;
+  onSnapshotContextMenu: (event: ReactMouseEvent<HTMLElement>, snapshot: ProjectSnapshot) => void;
+  renamingSnapshotId: string | null;
+  snapshotGroups: SnapshotGroup[];
+  snapshotNameDraft: string;
+  snapshotUiCopy: {
+    cancel: string;
+    namePlaceholder: string;
+    save: string;
+  };
+  selectedSnapshotId: string | null;
+};
+
+export function SnapshotHistoryList({
+  collapsedGroupKeys,
+  emptyBody,
+  emptyTitle,
+  language,
+  locale,
+  onCollapseGroupToggle,
+  onOpenSnapshot,
+  onRenameCancel,
+  onRenameDraftChange,
+  onRenameSnapshot,
+  onSnapshotContextMenu,
+  renamingSnapshotId,
+  snapshotGroups,
+  snapshotNameDraft,
+  snapshotUiCopy,
+  selectedSnapshotId
+}: SnapshotHistoryListProps) {
+  const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    setVisibleGroupCounts((currentCounts) => {
+      const nextCounts: Record<string, number> = {};
+      let hasChange = false;
+
+      for (const group of snapshotGroups) {
+        const totalCount = group.snapshots.length;
+        const currentCount = currentCounts[group.key] ?? Math.min(SNAPSHOT_GROUP_INITIAL_COUNT, totalCount);
+        const selectedIndex = selectedSnapshotId ? group.snapshots.findIndex((snapshot) => snapshot.id === selectedSnapshotId) : -1;
+        const nextCount = selectedIndex >= 0 ? Math.max(currentCount, selectedIndex + 1) : currentCount;
+        const boundedCount = Math.min(totalCount, Math.max(1, nextCount));
+        nextCounts[group.key] = boundedCount;
+        if (boundedCount !== currentCount) {
+          hasChange = true;
+        }
+      }
+
+      if (!hasChange && Object.keys(currentCounts).length === Object.keys(nextCounts).length) {
+        const currentKeys = Object.keys(currentCounts);
+        const nextKeys = Object.keys(nextCounts);
+        if (currentKeys.every((key) => nextCounts[key] === currentCounts[key])) {
+          return currentCounts;
+        }
+      }
+
+      return nextCounts;
+    });
+  }, [selectedSnapshotId, snapshotGroups]);
+
+  if (snapshotGroups.length === 0) {
+    return <EmptyState title={emptyTitle} body={emptyBody} />;
+  }
+
+  return (
+    <div className="snapshot-history-shell">
+      <div className="list-stack">
+        {snapshotGroups.map((group) => {
+          const isCollapsed = collapsedGroupKeys.includes(group.key);
+          const visibleCount = Math.min(group.snapshots.length, visibleGroupCounts[group.key] ?? SNAPSHOT_GROUP_INITIAL_COUNT);
+          const visibleSnapshots = group.snapshots.slice(0, visibleCount);
+          const remainingCount = group.snapshots.length - visibleSnapshots.length;
+
+          return (
+            <section key={group.key} className="snapshot-group">
+              <button
+                type="button"
+                className={`snapshot-group-head ${isCollapsed ? "is-collapsed" : ""}`}
+                onClick={() => onCollapseGroupToggle(group.key)}
+                aria-expanded={!isCollapsed}
+              >
+                <span className="snapshot-group-label">
+                  <span className="snapshot-group-chevron" aria-hidden="true">
+                    {isCollapsed ? ">" : "v"}
+                  </span>
+                  <strong title={group.title}>{group.title}</strong>
+                </span>
+                <span className="snapshot-group-meta">
+                  {group.shortCommit ? <code>{group.shortCommit}</code> : null}
+                  <span className="snapshot-group-count">{group.snapshots.length}</span>
+                </span>
+              </button>
+              {!isCollapsed ? (
+                <div className="snapshot-group-body">
+                  <div className="list-stack">
+                    {visibleSnapshots.map((snapshot) => (
+                      <article
+                        key={snapshot.id}
+                        className={`snapshot-row ${snapshot.id === selectedSnapshotId ? "is-active" : ""}`}
+                        onContextMenu={(event) => onSnapshotContextMenu(event, snapshot)}
+                      >
+                        {renamingSnapshotId === snapshot.id ? (
+                          <form
+                            className="snapshot-rename-form"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void onRenameSnapshot(snapshot);
+                            }}
+                          >
+                            <input
+                              className="snapshot-rename-input"
+                              value={snapshotNameDraft}
+                              onChange={(event) => onRenameDraftChange(event.target.value)}
+                              placeholder={snapshotUiCopy.namePlaceholder}
+                              maxLength={200}
+                            />
+                            <div className="snapshot-rename-actions">
+                              <button type="submit" className="secondary-button">
+                                {snapshotUiCopy.save}
+                              </button>
+                              <button type="button" className="ghost-button" onClick={onRenameCancel}>
+                                {snapshotUiCopy.cancel}
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="snapshot-row-body">
+                            <button type="button" className="snapshot-select-button" onClick={() => onOpenSnapshot(snapshot)}>
+                              <strong>{resolveSnapshotDisplayName(snapshot)}</strong>
+                              <span>{new Date(snapshot.createdAt).toLocaleString(locale)}</span>
+                              {snapshot.displayName !== snapshot.id ? <code>{shortId(snapshot.id)}</code> : null}
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                  {remainingCount > 0 ? (
+                    <button
+                      type="button"
+                      className="snapshot-group-more secondary-button"
+                      onClick={() =>
+                        setVisibleGroupCounts((currentCounts) => ({
+                          ...currentCounts,
+                          [group.key]: Math.min(group.snapshots.length, visibleCount + SNAPSHOT_GROUP_INCREMENT)
+                        }))
+                      }
+                    >
+                      {language === "zh" ? `显示更多 ${remainingCount}` : `Show ${remainingCount} more`}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
       </div>
     </div>
   );

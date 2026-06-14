@@ -35,6 +35,7 @@ import {
   MetricBadge,
   Panel,
   SelectionCard,
+  SnapshotHistoryList,
   SnapshotComparePanel,
   SnapshotDiagnosticsPanel
 } from "./app/components";
@@ -1054,82 +1055,24 @@ function App() {
             <section className="sidebar-card">
               <div className="sidebar-label">{copy.panels.snapshotsTitle}</div>
               <p className="sidebar-copy">{copy.panels.snapshotsSubtitle}</p>
-              <div className="list-stack">
-                {snapshots.length === 0 ? (
-                  <EmptyState title={copy.copy.snapshotsEmptyTitle} body={copy.copy.snapshotsEmptyBody} />
-                ) : (
-                  snapshotGroups.map((group) => (
-                    <section key={group.key} className="snapshot-group">
-                      <button
-                        type="button"
-                        className={`snapshot-group-head ${collapsedSnapshotGroupKeys.includes(group.key) ? "is-collapsed" : ""}`}
-                        onClick={() => handleToggleSnapshotGroup(group.key)}
-                        aria-expanded={!collapsedSnapshotGroupKeys.includes(group.key)}
-                      >
-                        <span className="snapshot-group-label">
-                          <span className="snapshot-group-chevron" aria-hidden="true">
-                            {collapsedSnapshotGroupKeys.includes(group.key) ? ">" : "v"}
-                          </span>
-                          <strong title={group.title}>{group.title}</strong>
-                        </span>
-                        <span className="snapshot-group-meta">
-                          {group.shortCommit ? <code>{group.shortCommit}</code> : null}
-                          <span className="snapshot-group-count">{group.snapshots.length}</span>
-                        </span>
-                      </button>
-                      {!collapsedSnapshotGroupKeys.includes(group.key) ? (
-                        <div className="list-stack">
-                          {group.snapshots.map((snapshot) => (
-                            <article
-                              key={snapshot.id}
-                              className={`snapshot-row ${snapshot.id === selectedSnapshotId ? "is-active" : ""}`}
-                              onContextMenu={(event) => handleSnapshotContextMenu(event, snapshot)}
-                            >
-                              {renamingSnapshotId === snapshot.id ? (
-                                <form
-                                  className="snapshot-rename-form"
-                                  onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void handleRenameSnapshot(snapshot);
-                                  }}
-                                >
-                                  <input
-                                    className="snapshot-rename-input"
-                                    value={snapshotNameDraft}
-                                    onChange={(event) => setSnapshotNameDraft(event.target.value)}
-                                    placeholder={snapshotUiCopy.namePlaceholder}
-                                    maxLength={200}
-                                  />
-                                  <div className="snapshot-rename-actions">
-                                    <button type="submit" className="secondary-button">
-                                      {snapshotUiCopy.save}
-                                    </button>
-                                    <button type="button" className="ghost-button" onClick={cancelSnapshotRename}>
-                                      {snapshotUiCopy.cancel}
-                                    </button>
-                                  </div>
-                                </form>
-                              ) : (
-                                <div className="snapshot-row-body">
-                                  <button
-                                    type="button"
-                                    className="snapshot-select-button"
-                                    onClick={() => void openProject(snapshot.projectId, snapshot.id)}
-                                  >
-                                    <strong>{resolveSnapshotDisplayName(snapshot)}</strong>
-                                    <span>{new Date(snapshot.createdAt).toLocaleString(copy.locale)}</span>
-                                    {snapshot.displayName !== snapshot.id ? <code>{shortId(snapshot.id)}</code> : null}
-                                  </button>
-                                </div>
-                              )}
-                            </article>
-                          ))}
-                        </div>
-                      ) : null}
-                    </section>
-                  ))
-                )}
-              </div>
+              <SnapshotHistoryList
+                collapsedGroupKeys={collapsedSnapshotGroupKeys}
+                emptyBody={copy.copy.snapshotsEmptyBody}
+                emptyTitle={copy.copy.snapshotsEmptyTitle}
+                language={settings.language}
+                locale={copy.locale}
+                onCollapseGroupToggle={handleToggleSnapshotGroup}
+                onOpenSnapshot={(snapshot) => void openProject(snapshot.projectId, snapshot.id)}
+                onRenameCancel={cancelSnapshotRename}
+                onRenameDraftChange={setSnapshotNameDraft}
+                onRenameSnapshot={(snapshot) => void handleRenameSnapshot(snapshot)}
+                onSnapshotContextMenu={handleSnapshotContextMenu}
+                renamingSnapshotId={renamingSnapshotId}
+                selectedSnapshotId={selectedSnapshotId}
+                snapshotGroups={snapshotGroups}
+                snapshotNameDraft={snapshotNameDraft}
+                snapshotUiCopy={snapshotUiCopy}
+              />
             </section>
           </aside>
 

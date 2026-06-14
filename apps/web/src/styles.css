@@ -778,6 +778,19 @@ textarea:focus-visible {
   gap: 6px;
 }
 
+.snapshot-group-body {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-group-more {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 10px;
+  justify-content: center;
+  font-size: 11px;
+}
+
 .snapshot-group-head {
   display: flex;
   align-items: center;

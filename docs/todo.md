@@ -45,8 +45,8 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 ## P1: Graph Performance and Usability
 
-- [ ] Reduce the main web bundle size.
-  Done when graph-heavy screens and settings are lazy-loaded and the main chunk warning is reduced or eliminated.
+- [x] Reduce the main web bundle size.
+  Done when graph-heavy screens are lazy-loaded and the main entry chunk warning is reduced or eliminated.
 - [ ] Virtualize long snapshot and change lists.
   Done when very large histories remain responsive.
 - [ ] Improve large-graph rendering strategy.

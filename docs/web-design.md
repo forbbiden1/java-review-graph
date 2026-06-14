@@ -73,6 +73,7 @@ Current implementation notes:
 
 - the graph renderer uses React Flow for interaction and ELK layered layout for node placement
 - class graph and method graph share the same renderer and scene persistence logic
+- the graph renderer is now lazy-loaded so the main application chunk stays small while the graph chunk loads on demand
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing

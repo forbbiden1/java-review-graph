@@ -1,4 +1,4 @@
-import { type FormEvent, type MouseEvent as ReactMouseEvent, useEffect, useState } from "react";
+import { type FormEvent, lazy, type MouseEvent as ReactMouseEvent, Suspense, useEffect, useState } from "react";
 import {
   compareSnapshots,
   exportChangeSetReviewMarkdown,
@@ -65,7 +65,6 @@ import {
   shortId,
   toMessage
 } from "./app/utils";
-import { GraphCanvas } from "./graph/GraphCanvas";
 import { formatEdgeTypeLabel, formatKindLabel, formatStatusLabel, getCopy } from "./i18n";
 import { SettingsDrawer } from "./SettingsDrawer";
 import {
@@ -80,6 +79,15 @@ import {
 } from "./platform";
 
 const runtime = resolveRuntimeInfo();
+const GraphCanvas = lazy(() => import("./graph/GraphCanvas").then((module) => ({ default: module.GraphCanvas })));
+
+function GraphLoadingState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="graph-stage graph-loading-stage">
+      <EmptyState title={title} body={body} />
+    </div>
+  );
+}
 
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -768,21 +776,23 @@ function App() {
     return (
       <div className={`graph-panel-body ${isExpanded ? "is-expanded" : ""}`}>
         {isExpanded ? null : renderClassGraphFilterControls()}
-        <GraphCanvas
-          nodes={filteredClassGraph?.nodes ?? []}
-          edges={filteredClassGraph?.edges ?? []}
-          immersive={isExpanded}
-          selectedNodeId={selectedClassId}
-          sceneStorageKey={classGraphSceneStorageKey}
-          onNodeClick={(node) => void handleSelectClass(node)}
-          emptyTitle={classGraphEmptyState.title}
-          emptyBody={classGraphEmptyState.body}
-          formatEdgeType={(edgeType) => formatClassGraphEdgeType(edgeType, settings.language)}
-          formatNodeKind={(kind) => formatKindLabel(kind, "en")}
-          labels={copy.graph}
-          overlayAction={isExpanded ? null : renderGraphExpandAction("class")}
-          overlayPanel={isExpanded ? renderClassGraphFilterControls(true) : null}
-        />
+        <Suspense fallback={<GraphLoadingState title={classGraphEmptyState.title} body={copy.copy.graphLoadingBody} />}>
+          <GraphCanvas
+            nodes={filteredClassGraph?.nodes ?? []}
+            edges={filteredClassGraph?.edges ?? []}
+            immersive={isExpanded}
+            selectedNodeId={selectedClassId}
+            sceneStorageKey={classGraphSceneStorageKey}
+            onNodeClick={(node) => void handleSelectClass(node)}
+            emptyTitle={classGraphEmptyState.title}
+            emptyBody={classGraphEmptyState.body}
+            formatEdgeType={(edgeType) => formatClassGraphEdgeType(edgeType, settings.language)}
+            formatNodeKind={(kind) => formatKindLabel(kind, "en")}
+            labels={copy.graph}
+            overlayAction={isExpanded ? null : renderGraphExpandAction("class")}
+            overlayPanel={isExpanded ? renderClassGraphFilterControls(true) : null}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -790,20 +800,22 @@ function App() {
   function renderMethodGraphPanelBody(isExpanded = false) {
     return (
       <div className={`graph-panel-body ${isExpanded ? "is-expanded" : ""}`}>
-        <GraphCanvas
-          nodes={methodGraph?.nodes ?? []}
-          edges={methodGraph?.edges ?? []}
-          immersive={isExpanded}
-          selectedNodeId={selectedMethodId}
-          sceneStorageKey={methodGraphSceneStorageKey}
-          onNodeClick={(node) => setSelectedMethodId(node.id)}
-          emptyTitle={copy.copy.methodGraphEmptyTitle}
-          emptyBody={copy.copy.methodGraphEmptyBody}
-          formatEdgeType={(edgeType) => formatEdgeTypeLabel(edgeType, settings.language)}
-          formatNodeKind={(kind) => formatKindLabel(kind, "en")}
-          labels={copy.graph}
-          overlayAction={isExpanded ? null : renderGraphExpandAction("method")}
-        />
+        <Suspense fallback={<GraphLoadingState title={copy.copy.methodGraphEmptyTitle} body={copy.copy.graphLoadingBody} />}>
+          <GraphCanvas
+            nodes={methodGraph?.nodes ?? []}
+            edges={methodGraph?.edges ?? []}
+            immersive={isExpanded}
+            selectedNodeId={selectedMethodId}
+            sceneStorageKey={methodGraphSceneStorageKey}
+            onNodeClick={(node) => setSelectedMethodId(node.id)}
+            emptyTitle={copy.copy.methodGraphEmptyTitle}
+            emptyBody={copy.copy.methodGraphEmptyBody}
+            formatEdgeType={(edgeType) => formatEdgeTypeLabel(edgeType, settings.language)}
+            formatNodeKind={(kind) => formatKindLabel(kind, "en")}
+            labels={copy.graph}
+            overlayAction={isExpanded ? null : renderGraphExpandAction("method")}
+          />
+        </Suspense>
       </div>
     );
   }

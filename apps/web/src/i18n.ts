@@ -77,6 +77,7 @@ export type AppCopy = {
     changesEmptyBody: string;
     changesEmptyTitle: string;
     fullIndexHint: string;
+    graphLoadingBody: string;
     incrementalGitHint: string;
     incrementalManualHint: string;
     languageHint: string;
@@ -224,6 +225,7 @@ const EN_COPY: AppCopy = {
     changesEmptyBody: "The first snapshot often starts with added symbols only after indexing.",
     changesEmptyTitle: "No change records",
     fullIndexHint: "Full mode rescans all discovered Java source roots for the selected project.",
+    graphLoadingBody: "Loading the graph renderer and layout engine...",
     incrementalGitHint:
       "Git Auto collects changed paths from the latest snapshot commit to the current workspace, and falls back to current working tree changes when the latest snapshot has no committed Git base.",
     incrementalManualHint: "Manual mode accepts one relative file path per line.",
@@ -374,6 +376,7 @@ const ZH_COPY = {
     changesEmptyBody: "第一份快照通常会在索引完成后，才出现新增符号等变更记录。",
     changesEmptyTitle: "还没有变更记录",
     fullIndexHint: "全量模式会重新扫描当前项目下识别到的全部 Java 源码目录。",
+    graphLoadingBody: "正在加载图谱渲染器和布局引擎...",
     incrementalGitHint:
       "Git 自动会从最新快照对应的 commit 到当前工作区收集变更路径；如果最新快照没有可用的提交基线，则退回为当前工作区变更。",
     incrementalManualHint: "手工模式按行输入相对路径，每行一个文件。",

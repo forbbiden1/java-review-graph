@@ -70,7 +70,8 @@ or
 ```json
 {
   "mode": "incremental",
-  "changeSource": "git"
+  "changeSource": "git",
+  "impactDepth": 2
 }
 ```
 
@@ -92,6 +93,7 @@ Current behavior:
 - supports `changeSource = git` or `manual` for `incremental`
 - defaults `changeSource` to `git` when omitted
 - requires `changedFiles` only for `manual` incremental requests
+- supports optional `impactDepth` for incremental requests, defaulting to `1` and clamped to `1..4`
 - uses the latest snapshot as the incremental base when one exists
 - when `changeSource = git`, collects changed paths from the latest snapshot commit to the current workspace state
 - also includes current uncommitted and untracked Git changes in automatic incremental mode
@@ -201,7 +203,7 @@ Current behavior:
 Current behavior:
 
 - returns persisted `added`, `modified_api`, `modified_impl`, `impacted`, and `deleted` entries for the selected snapshot
-- `impacted` is derived with one-hop propagation from changed or deleted neighbors
+- `impacted` is derived from changed or deleted neighbors with configurable impact depth, defaulting to one hop
 
 ### Query symbol path
 

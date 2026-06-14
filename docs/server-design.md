@@ -70,7 +70,7 @@ The first implemented server flow should cover:
 - reuse unchanged files, symbols, and relations from the base snapshot
 - fall back to a full scan when build metadata changed or no base snapshot exists
 - persist the assembled snapshot and change set
-- compute one-hop impacted symbol summary
+- compute impacted symbol summary with configurable propagation depth, defaulting to one hop
 
 ### Graph query
 

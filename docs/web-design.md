@@ -84,6 +84,7 @@ Current implementation notes:
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
 - the change-set review controls are independent from indexing controls and support Git auto, manual file lists, and explicit commit-range inputs
+- incremental indexing now also exposes a small impact-depth control so demos can compare one-hop and multi-hop impacted-symbol expansion
 - the same review panel now surfaces structured risk factors with score contribution and evidence, so interview demos can explain exactly why one change set is low, medium, or high risk
 - the change-set review panel also shows direct propagation paths so users can explain why one changed symbol affects a downstream review target
 - the review panel now also requests one bounded symbol-path trace between a changed symbol and an impacted symbol, so the demo can show a multi-hop impact explanation beyond one-hop propagation

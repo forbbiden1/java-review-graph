@@ -78,6 +78,7 @@
 - 当前 UI 已接入现有后端接口和 SQLite 快照数据
 - 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告
 - change-set review 控件已与索引控件解耦，支持 Git 自动、手工文件列表和明确提交区间三种来源
+- 增量索引现在还提供一个很小的影响深度控制，方便演示一跳和多跳 impacted 扩散的差异
 - 同一个 review 面板现在还会展示结构化风险因子、分值贡献和证据，方便在演示里解释为什么风险等级会落到低 / 中 / 高
 - change-set review 面板现在还会展示直接传播路径，帮助解释为什么某一个变更会影响下游 review 目标
 - review 面板现在还会补充一条 changed symbol 到 impacted symbol 的有界 impact trace，用多跳路径解释结构影响是如何传递的

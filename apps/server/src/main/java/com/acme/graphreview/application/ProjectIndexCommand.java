@@ -5,6 +5,7 @@ import java.util.List;
 public record ProjectIndexCommand(
         String mode,
         String changeSource,
-        List<String> changedFiles
+        List<String> changedFiles,
+        Integer impactDepth
 ) {
 }

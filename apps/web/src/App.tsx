@@ -110,6 +110,7 @@ function App() {
   const [importRootPath, setImportRootPath] = useState("C:/Users/29768/Desktop/java-review-graph");
   const [indexMode, setIndexMode] = useState<"full" | "incremental">("full");
   const [indexChangeSource, setIndexChangeSource] = useState<IndexChangeSource>("git");
+  const [indexImpactDepth, setIndexImpactDepth] = useState("1");
   const [reviewChangeSource, setReviewChangeSource] = useState<ReviewChangeSource>("git");
   const [classGraphDisplayMode, setClassGraphDisplayMode] = useState<ClassGraphDisplayMode>("full");
   const [classGraphSearchQuery, setClassGraphSearchQuery] = useState("");
@@ -497,11 +498,13 @@ function App() {
     setErrorMessage(null);
     try {
       const changedFiles = indexMode === "incremental" && indexChangeSource === "manual" ? manualChangedFiles : undefined;
+      const normalizedImpactDepth = Math.max(1, Math.min(Number(indexImpactDepth) || 1, 4));
 
       const result = await triggerIndex(selectedProjectId, {
         mode: indexMode,
         changeSource: indexMode === "incremental" ? indexChangeSource : undefined,
-        changedFiles
+        changedFiles,
+        impactDepth: indexMode === "incremental" ? normalizedImpactDepth : undefined
       });
 
       setWorkspaceMessage(
@@ -1064,10 +1067,21 @@ function App() {
                   </button>
                 </div>
 
-                {indexMode === "incremental" ? (
-                  <>
-                    <label className="field">
-                      <span>{copy.fields.incrementalSource}</span>
+                    {indexMode === "incremental" ? (
+                      <>
+                        <label className="field">
+                          <span>{settings.language === "zh" ? "影响传播深度" : "Impact Depth"}</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={4}
+                            value={indexImpactDepth}
+                            onChange={(event) => setIndexImpactDepth(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="field">
+                          <span>{copy.fields.incrementalSource}</span>
                       <div className="segmented-control" role="tablist" aria-label={copy.fields.incrementalSource}>
                         <button
                           type="button"

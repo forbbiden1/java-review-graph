@@ -103,6 +103,7 @@ public class ProjectIndexService {
         boolean incremental = parseIncrementalFlag(command.mode());
         IncrementalChangeSource incrementalChangeSource = parseIncrementalChangeSource(command.changeSource(), incremental);
         List<String> requestedChangedFiles = sanitizeChangedFiles(command.changedFiles());
+        int impactDepth = normalizeImpactDepth(command.impactDepth());
 
         ProjectDescriptor descriptor = projectDescriptorFactory.create(project);
         ProjectSnapshot previousSnapshot = snapshotRepository.findLatestByProjectId(project.id()).orElse(null);
@@ -190,7 +191,8 @@ public class ProjectIndexService {
                 previousSymbols,
                 assembledAnalysisSnapshot.relations(),
                 previousRelations,
-                incrementalPlan.incremental()
+                incrementalPlan.incremental(),
+                impactDepth
         );
         AnalysisSnapshot persistedAnalysisSnapshot = new AnalysisSnapshot(
                 assembledAnalysisSnapshot.snapshotId(),
@@ -292,6 +294,13 @@ public class ProjectIndexService {
             return "Detected rename/move: " + renamedPaths.get(0) + ".";
         }
         return "Detected " + renamedPaths.size() + " rename/move path(s).";
+    }
+
+    private int normalizeImpactDepth(Integer impactDepth) {
+        if (impactDepth == null) {
+            return 1;
+        }
+        return Math.max(1, Math.min(impactDepth, 4));
     }
 
     private enum IncrementalChangeSource {

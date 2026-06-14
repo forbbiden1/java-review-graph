@@ -125,7 +125,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "manual", List.of("src/main/java/demo/Service.java"))
+                new ProjectIndexCommand("incremental", "manual", List.of("src/main/java/demo/Service.java"), null)
         );
 
         assertNotNull(analyzer.lastRequest);
@@ -224,7 +224,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "manual", List.of("README.md"))
+                new ProjectIndexCommand("incremental", "manual", List.of("README.md"), null)
         );
 
         assertEquals(0, analyzer.callCount);
@@ -314,7 +314,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "manual", List.of("pom.xml"))
+                new ProjectIndexCommand("incremental", "manual", List.of("pom.xml"), null)
         );
 
         assertEquals(1, analyzer.callCount);
@@ -416,7 +416,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "manual", List.of("src/main/java/demo/Service.java"))
+                new ProjectIndexCommand("incremental", "manual", List.of("src/main/java/demo/Service.java"), null)
         );
 
         assertEquals(1, analyzer.callCount);
@@ -543,7 +543,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "git", List.of())
+                new ProjectIndexCommand("incremental", "git", List.of(), null)
         );
 
         assertEquals(
@@ -655,7 +655,7 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "git", List.of())
+                new ProjectIndexCommand("incremental", "git", List.of(), null)
         );
 
         assertEquals("abcdef1234567890", gitResolver.lastBaseCommit);
@@ -729,12 +729,112 @@ class ProjectIndexServiceTest {
 
         ProjectIndexResult result = service.indexProject(
                 project.id(),
-                new ProjectIndexCommand("incremental", "git", List.of())
+                new ProjectIndexCommand("incremental", "git", List.of(), null)
         );
 
         assertNull(result.snapshot().gitCommit());
         assertNull(result.snapshot().gitCommitMessage());
         assertTrue(result.snapshot().includesWorkspaceChanges());
+    }
+
+    @Test
+    void marksTwoHopNeighborsAsImpactedWhenImpactDepthIsRaised() throws Exception {
+        Path sourceRoot = tempDir.resolve(Path.of("src", "main", "java", "demo"));
+        java.nio.file.Files.createDirectories(sourceRoot);
+        java.nio.file.Files.writeString(sourceRoot.resolve("Service.java"), "package demo; class Service {}");
+        java.nio.file.Files.writeString(sourceRoot.resolve("Gateway.java"), "package demo; class Gateway {}");
+        java.nio.file.Files.writeString(sourceRoot.resolve("Controller.java"), "package demo; class Controller {}");
+
+        RegisteredProject project = new RegisteredProject(
+                "project-1",
+                "demo",
+                tempDir.toString(),
+                "maven",
+                Instant.now(),
+                Instant.now()
+        );
+        ProjectSnapshot previousSnapshot = new ProjectSnapshot(
+                "snapshot-0",
+                project.id(),
+                null,
+                "manual",
+                null,
+                null,
+                "snapshot-0",
+                "completed",
+                Instant.now()
+        );
+
+        SymbolRecord previousService = typeSymbol("type:root:demo.Service", "demo.Service", "Service", "api-service-v1", "impl-service-v1");
+        SymbolRecord previousGateway = typeSymbol("type:root:demo.Gateway", "demo.Gateway", "Gateway", "api-gateway-v1", "impl-gateway-v1");
+        SymbolRecord previousController = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller", "api-controller-v1", "impl-controller-v1");
+        RelationRecord previousGatewayUsesService = relation(previousGateway.symbolKey(), previousService.symbolKey(), RelationType.USES_TYPE);
+        RelationRecord previousControllerUsesGateway = relation(previousController.symbolKey(), previousGateway.symbolKey(), RelationType.USES_TYPE);
+
+        SymbolRecord currentService = typeSymbol("type:root:demo.Service", "demo.Service", "Service", "api-service-v1", "impl-service-v2");
+        SymbolRecord currentGateway = typeSymbol("type:root:demo.Gateway", "demo.Gateway", "Gateway", "api-gateway-v1", "impl-gateway-v1");
+        SymbolRecord currentController = typeSymbol("type:root:demo.Controller", "demo.Controller", "Controller", "api-controller-v1", "impl-controller-v1");
+        AnalysisSnapshot incrementalSnapshot = new AnalysisSnapshot(
+                "snapshot-1",
+                project.id(),
+                Instant.now(),
+                List.of(
+                        file("src/main/java/demo/Service.java"),
+                        file("src/main/java/demo/Gateway.java"),
+                        file("src/main/java/demo/Controller.java")
+                ),
+                List.of(currentService, currentGateway, currentController),
+                List.of(
+                        relation(currentGateway.symbolKey(), currentService.symbolKey(), RelationType.USES_TYPE),
+                        relation(currentController.symbolKey(), currentGateway.symbolKey(), RelationType.USES_TYPE)
+                ),
+                "incremental"
+        );
+
+        InMemorySnapshotRepository snapshotRepository = new InMemorySnapshotRepository(previousSnapshot);
+        InMemorySymbolRepository symbolRepository = new InMemorySymbolRepository(Map.of(
+                previousSnapshot.id(),
+                List.of(previousService, previousGateway, previousController)
+        ));
+        InMemoryRelationRepository relationRepository = new InMemoryRelationRepository(Map.of(
+                previousSnapshot.id(),
+                List.of(previousGatewayUsesService, previousControllerUsesGateway)
+        ));
+        InMemorySymbolChangeRepository symbolChangeRepository = new InMemorySymbolChangeRepository();
+        InMemorySourceFileRepository sourceFileRepository = new InMemorySourceFileRepository(Map.of(
+                previousSnapshot.id(),
+                List.of(
+                        new StoredSourceFile("prev-service-file", "src/main/java/demo/Service.java", "root", "demo", "content-hash-service", "main"),
+                        new StoredSourceFile("prev-gateway-file", "src/main/java/demo/Gateway.java", "root", "demo", "content-hash-gateway", "main"),
+                        new StoredSourceFile("prev-controller-file", "src/main/java/demo/Controller.java", "root", "demo", "content-hash-controller", "main")
+                )
+        ));
+
+        StubJdtProjectAnalyzer analyzer = new StubJdtProjectAnalyzer(incrementalSnapshot);
+        ProjectIndexService service = new ProjectIndexService(
+                new StubProjectService(project),
+                snapshotRepository,
+                sourceFileRepository,
+                symbolRepository,
+                relationRepository,
+                symbolChangeRepository,
+                new StubProjectDescriptorFactory(project),
+                analyzer,
+                new StubGitSnapshotMetadataResolver()
+        );
+
+        ProjectIndexResult result = service.indexProject(
+                project.id(),
+                new ProjectIndexCommand("incremental", "manual", List.of("src/main/java/demo/Service.java"), 2)
+        );
+
+        List<SymbolRecord> storedCurrentSymbols = symbolRepository.findByProjectIdAndSnapshotId(project.id(), result.snapshot().id());
+        Map<String, ChangeStatus> statusBySymbolKey = new HashMap<>();
+        storedCurrentSymbols.forEach(symbol -> statusBySymbolKey.put(symbol.symbolKey(), symbol.changeStatus()));
+
+        assertEquals(ChangeStatus.MODIFIED_IMPL, statusBySymbolKey.get(currentService.symbolKey()));
+        assertEquals(ChangeStatus.IMPACTED, statusBySymbolKey.get(currentGateway.symbolKey()));
+        assertEquals(ChangeStatus.IMPACTED, statusBySymbolKey.get(currentController.symbolKey()));
     }
 
     private static SymbolRecord typeSymbol(String symbolKey, String qualifiedName, String name, String apiHash, String implHash) {

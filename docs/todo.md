@@ -22,7 +22,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when fallback reasons such as build-file changes or missing base snapshot are visible.
 - [x] Handle rename and move scenarios explicitly.
   Done when file renames do not silently appear as unrelated delete-plus-add without explanation.
-- [ ] Make impact propagation depth configurable.
+- [x] Make impact propagation depth configurable.
   Done when one-hop stays the default but deeper propagation can be enabled intentionally.
 
 ## P1: Backend Refactor

@@ -6,6 +6,7 @@ import com.acme.model.graph.RelationType;
 import com.acme.model.graph.SymbolRecord;
 import com.acme.model.review.ChangeStatus;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -23,7 +24,8 @@ public class ChangeStatusCalculator {
             List<SymbolRecord> previousSymbols,
             List<RelationRecord> currentRelations,
             List<RelationRecord> previousRelations,
-            boolean incremental
+            boolean incremental,
+            int impactDepth
     ) {
         Map<String, SymbolRecord> previousBySymbolKey = previousSymbols.stream()
                 .collect(Collectors.toMap(SymbolRecord::symbolKey, symbol -> symbol, (left, right) -> left));
@@ -65,7 +67,8 @@ public class ChangeStatusCalculator {
                 currentSymbols,
                 previousSymbols,
                 currentRelations,
-                previousRelations
+                previousRelations,
+                impactDepth
         );
 
         return symbolsWithDirectStatus.stream()
@@ -104,7 +107,7 @@ public class ChangeStatusCalculator {
                         case ADDED -> "New symbol discovered in current snapshot.";
                         case MODIFIED_API -> "API hash changed compared with the previous snapshot.";
                         case MODIFIED_IMPL -> "Implementation hash changed compared with the previous snapshot.";
-                        case IMPACTED -> "Symbol is directly related to a changed neighbor in the current snapshot.";
+                        case IMPACTED -> "Symbol is related to a changed neighbor in the current snapshot impact propagation.";
                         default -> "Symbol changed.";
                     }
             ));
@@ -132,7 +135,8 @@ public class ChangeStatusCalculator {
             List<SymbolRecord> currentSymbols,
             List<SymbolRecord> previousSymbols,
             List<RelationRecord> currentRelations,
-            List<RelationRecord> previousRelations
+            List<RelationRecord> previousRelations,
+            int impactDepth
     ) {
         Map<String, SymbolRecord> currentBySymbolKey = currentSymbols.stream()
                 .collect(Collectors.toMap(SymbolRecord::symbolKey, symbol -> symbol, (left, right) -> left));
@@ -168,6 +172,7 @@ public class ChangeStatusCalculator {
             }
         }
 
+        int boundedDepth = Math.max(1, impactDepth);
         Set<String> impactedSymbolKeys = new HashSet<>();
         for (String changedSymbolKey : changedSymbolKeys) {
             SymbolRecord changedSymbol = currentBySymbolKey.get(changedSymbolKey);
@@ -178,17 +183,30 @@ public class ChangeStatusCalculator {
                 continue;
             }
 
-            for (String neighborKey : neighborsBySymbolKey.getOrDefault(changedSymbolKey, Set.of())) {
-                SymbolRecord neighbor = currentBySymbolKey.get(neighborKey);
-                if (neighbor == null) {
+            ArrayDeque<ImpactTraversalState> queue = new ArrayDeque<>();
+            Set<String> visited = new HashSet<>();
+            queue.addLast(new ImpactTraversalState(changedSymbolKey, 0));
+            visited.add(changedSymbolKey);
+
+            while (!queue.isEmpty()) {
+                ImpactTraversalState state = queue.removeFirst();
+                if (state.depth() >= boundedDepth) {
                     continue;
                 }
-                if (neighbor.symbolType() == changedSymbol.symbolType()) {
-                    impactedSymbolKeys.add(neighborKey);
-                } else if (neighbor.symbolType() == com.acme.model.graph.SymbolType.TYPE) {
-                    impactedSymbolKeys.add(neighborKey);
-                } else if (changedSymbol.symbolType() == com.acme.model.graph.SymbolType.TYPE) {
-                    impactedSymbolKeys.add(neighborKey);
+                for (String neighborKey : neighborsBySymbolKey.getOrDefault(state.symbolKey(), Set.of())) {
+                    if (!visited.add(neighborKey)) {
+                        continue;
+                    }
+                    SymbolRecord neighbor = currentBySymbolKey.get(neighborKey);
+                    if (neighbor == null) {
+                        continue;
+                    }
+                    if (neighbor.symbolType() == changedSymbol.symbolType()
+                            || neighbor.symbolType() == com.acme.model.graph.SymbolType.TYPE
+                            || changedSymbol.symbolType() == com.acme.model.graph.SymbolType.TYPE) {
+                        impactedSymbolKeys.add(neighborKey);
+                    }
+                    queue.addLast(new ImpactTraversalState(neighborKey, state.depth() + 1));
                 }
             }
 
@@ -225,5 +243,8 @@ public class ChangeStatusCalculator {
                 symbol.implHash(),
                 changeStatus
         );
+    }
+
+    private record ImpactTraversalState(String symbolKey, int depth) {
     }
 }

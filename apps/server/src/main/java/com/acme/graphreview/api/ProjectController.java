@@ -88,7 +88,7 @@ public class ProjectController {
     ) {
         return ProjectIndexResponse.from(projectIndexService.indexProject(
                 projectId,
-                new ProjectIndexCommand(request.mode(), request.changeSource(), request.changedFiles())
+                new ProjectIndexCommand(request.mode(), request.changeSource(), request.changedFiles(), request.impactDepth())
         ));
     }
 

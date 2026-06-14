@@ -354,7 +354,7 @@ export function deleteSnapshot(projectId: string, snapshotId: string) {
 
 export function triggerIndex(
   projectId: string,
-  payload: { mode: "full" | "incremental"; changeSource?: "git" | "manual"; changedFiles?: string[] }
+  payload: { mode: "full" | "incremental"; changeSource?: "git" | "manual"; changedFiles?: string[]; impactDepth?: number }
 ) {
   return request<ProjectIndexResult>(`/api/projects/${encodeURIComponent(projectId)}/index`, {
     method: "POST",

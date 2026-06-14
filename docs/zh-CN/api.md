@@ -44,7 +44,8 @@
 ```json
 {
   "mode": "incremental",
-  "changeSource": "git"
+  "changeSource": "git",
+  "impactDepth": 2
 }
 ```
 
@@ -66,6 +67,7 @@
 - `incremental` 支持 `changeSource = git` 或 `manual`
 - 未显式传入 `changeSource` 时默认按 `git` 处理
 - `manual` 增量模式要求提供 `changedFiles`
+- `impactDepth` 可选，默认是 `1`，并限制在 `1..4`
 - 自动增量模式会基于最新快照对应的 Git 基线和当前工作区收集变更文件
 - 会持久化快照、诊断信息以及完整 `source_file`、`symbol`、`relation`、`symbol_change`
 
@@ -157,7 +159,7 @@
 当前行为：
 
 - 返回 `added`、`modified_api`、`modified_impl`、`impacted`、`deleted`
-- `impacted` 基于一跳传播规则计算
+- `impacted` 基于可配置传播深度计算，默认仍是一跳
 
 ## `GET /api/projects/{projectId}/symbols/path?snapshotId={snapshotId}&sourceSymbolKey={sourceSymbolKey}&targetSymbolKey={targetSymbolKey}&maxDepth=4`
 

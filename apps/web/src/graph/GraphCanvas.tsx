@@ -1,6 +1,7 @@
 import "@xyflow/react/dist/style.css";
 
-import ELK from "elkjs/lib/elk.bundled.js";
+import ELK from "elkjs/lib/elk-api.js";
+import elkWorkerUrl from "elkjs/lib/elk-worker.min.js?url";
 import {
   type ChangeEvent,
   type CSSProperties,
@@ -122,7 +123,7 @@ type LayoutResult = {
   nodes: FlowNode[];
 };
 
-const elk = new ELK();
+const elk = new ELK({ workerUrl: elkWorkerUrl });
 
 const SAFE_MIN_ZOOM = 0.000001;
 const VIEWPORT_PADDING = 160;

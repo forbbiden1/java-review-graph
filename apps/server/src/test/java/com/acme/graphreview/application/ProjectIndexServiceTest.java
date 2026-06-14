@@ -989,6 +989,31 @@ class ProjectIndexServiceTest {
         public List<RelationRecord> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
             return relationsBySnapshotId.getOrDefault(snapshotId, List.of());
         }
+
+        @Override
+        public List<RelationRecord> findByProjectIdAndSnapshotIdAndTypes(
+                String projectId,
+                String snapshotId,
+                List<RelationType> relationTypes
+        ) {
+            return findByProjectIdAndSnapshotId(projectId, snapshotId).stream()
+                    .filter(relation -> relationTypes.contains(relation.relationType()))
+                    .toList();
+        }
+
+        @Override
+        public List<RelationRecord> findByProjectIdAndSnapshotIdAndSymbolKeys(
+                String projectId,
+                String snapshotId,
+                RelationType relationType,
+                Set<String> sourceOrTargetSymbolKeys
+        ) {
+            return findByProjectIdAndSnapshotId(projectId, snapshotId).stream()
+                    .filter(relation -> relation.relationType() == relationType)
+                    .filter(relation -> sourceOrTargetSymbolKeys.contains(relation.sourceSymbolKey()))
+                    .filter(relation -> sourceOrTargetSymbolKeys.contains(relation.targetSymbolKey()))
+                    .toList();
+        }
     }
 
     private static final class InMemorySymbolChangeRepository implements SymbolChangeRepository {

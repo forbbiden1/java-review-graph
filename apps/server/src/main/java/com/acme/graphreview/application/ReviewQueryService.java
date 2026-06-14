@@ -7,9 +7,7 @@ import com.acme.model.graph.RelationRecord;
 import com.acme.model.graph.RelationType;
 import com.acme.model.graph.SymbolRecord;
 import com.acme.model.graph.SymbolType;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -42,14 +40,18 @@ public class ReviewQueryService {
 
     public List<RelationRecord> getClassGraphEdges(String projectId, String snapshotId) {
         String resolvedSnapshotId = resolveSnapshotId(projectId, snapshotId);
-        List<SymbolRecord> types = symbolRepository.findByProjectIdAndSnapshotIdAndType(projectId, resolvedSnapshotId, SymbolType.TYPE);
-        Set<String> typeKeys = types.stream()
+        var typeKeys = symbolRepository.findByProjectIdAndSnapshotIdAndType(projectId, resolvedSnapshotId, SymbolType.TYPE)
+                .stream()
                 .map(SymbolRecord::symbolKey)
-                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
-        return relationRepository.findByProjectIdAndSnapshotId(projectId, resolvedSnapshotId).stream()
-                .filter(relation -> relation.relationType() == RelationType.EXTENDS
-                        || relation.relationType() == RelationType.IMPLEMENTS
-                        || relation.relationType() == RelationType.USES_TYPE)
+                .collect(java.util.stream.Collectors.toSet());
+        if (typeKeys.isEmpty()) {
+            return List.of();
+        }
+        return relationRepository.findByProjectIdAndSnapshotIdAndTypes(
+                projectId,
+                resolvedSnapshotId,
+                List.of(RelationType.EXTENDS, RelationType.IMPLEMENTS, RelationType.USES_TYPE)
+        ).stream()
                 .filter(relation -> typeKeys.contains(relation.sourceSymbolKey()) && typeKeys.contains(relation.targetSymbolKey()))
                 .toList();
     }
@@ -66,14 +68,19 @@ public class ReviewQueryService {
 
     public List<RelationRecord> getMethodGraphEdges(String projectId, String snapshotId, String classId) {
         String resolvedSnapshotId = resolveSnapshotId(projectId, snapshotId);
-        Set<String> methodKeys = symbolRepository.findByProjectIdAndSnapshotIdAndParentSymbolKey(projectId, resolvedSnapshotId, classId)
+        var methodKeys = symbolRepository.findByProjectIdAndSnapshotIdAndParentSymbolKey(projectId, resolvedSnapshotId, classId)
                 .stream()
                 .map(SymbolRecord::symbolKey)
-                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
-        return relationRepository.findByProjectIdAndSnapshotId(projectId, resolvedSnapshotId).stream()
-                .filter(relation -> relation.relationType() == RelationType.CALLS)
-                .filter(relation -> methodKeys.contains(relation.sourceSymbolKey()) && methodKeys.contains(relation.targetSymbolKey()))
-                .toList();
+                .collect(java.util.stream.Collectors.toSet());
+        if (methodKeys.isEmpty()) {
+            return List.of();
+        }
+        return relationRepository.findByProjectIdAndSnapshotIdAndSymbolKeys(
+                projectId,
+                resolvedSnapshotId,
+                RelationType.CALLS,
+                methodKeys
+        );
     }
 
     public String resolveSnapshotId(String projectId, String snapshotId) {

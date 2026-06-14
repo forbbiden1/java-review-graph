@@ -5,8 +5,10 @@ import com.acme.model.graph.RelationRecord;
 import com.acme.model.graph.RelationType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -50,7 +52,79 @@ public class JdbcRelationRepository implements RelationRepository {
     @Override
     public List<RelationRecord> findByProjectIdAndSnapshotId(String projectId, String snapshotId) {
         return jdbcTemplate.query(
-                """
+                baseRelationSelect() + """
+                where relation.project_id = ? and relation.snapshot_id = ?
+                order by relation_type, source_symbol_key, target_symbol_key
+                """,
+                RELATION_ROW_MAPPER,
+                projectId,
+                snapshotId
+        );
+    }
+
+    @Override
+    public List<RelationRecord> findByProjectIdAndSnapshotIdAndTypes(
+            String projectId,
+            String snapshotId,
+            List<RelationType> relationTypes
+    ) {
+        if (relationTypes == null || relationTypes.isEmpty()) {
+            return List.of();
+        }
+
+        String placeholders = String.join(", ", java.util.Collections.nCopies(relationTypes.size(), "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(projectId);
+        args.add(snapshotId);
+        relationTypes.stream()
+                .map(type -> type.name().toLowerCase())
+                .forEach(args::add);
+
+        return jdbcTemplate.query(
+                baseRelationSelect() + """
+                where relation.project_id = ? and relation.snapshot_id = ?
+                  and relation.relation_type in (""" + placeholders + ") " + """
+                order by relation_type, source_symbol_key, target_symbol_key
+                """,
+                RELATION_ROW_MAPPER,
+                args.toArray()
+        );
+    }
+
+    @Override
+    public List<RelationRecord> findByProjectIdAndSnapshotIdAndSymbolKeys(
+            String projectId,
+            String snapshotId,
+            RelationType relationType,
+            Set<String> sourceOrTargetSymbolKeys
+    ) {
+        if (sourceOrTargetSymbolKeys == null || sourceOrTargetSymbolKeys.isEmpty()) {
+            return List.of();
+        }
+
+        String placeholders = String.join(", ", java.util.Collections.nCopies(sourceOrTargetSymbolKeys.size(), "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(projectId);
+        args.add(snapshotId);
+        args.add(relationType.name().toLowerCase());
+        sourceOrTargetSymbolKeys.forEach(args::add);
+        sourceOrTargetSymbolKeys.forEach(args::add);
+
+        return jdbcTemplate.query(
+                baseRelationSelect() + """
+                where relation.project_id = ? and relation.snapshot_id = ?
+                  and relation.relation_type = ?
+                  and relation.source_symbol_key in (""" + placeholders + ") " + """
+                  and relation.target_symbol_key in (""" + placeholders + ") " + """
+                order by source_symbol_key, target_symbol_key
+                """,
+                RELATION_ROW_MAPPER,
+                args.toArray()
+        );
+    }
+
+    private String baseRelationSelect() {
+        return """
                 select relation.source_symbol_key,
                        relation.target_symbol_key,
                        relation.relation_type,
@@ -59,13 +133,7 @@ public class JdbcRelationRepository implements RelationRepository {
                        relation.source_line
                 from relation
                 left join source_file on source_file.id = relation.source_file_id
-                where project_id = ? and snapshot_id = ?
-                order by relation_type, source_symbol_key, target_symbol_key
-                """,
-                RELATION_ROW_MAPPER,
-                projectId,
-                snapshotId
-        );
+                """;
     }
 
     private static final class RelationRowMapper implements RowMapper<RelationRecord> {

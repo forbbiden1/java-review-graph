@@ -34,6 +34,8 @@ Current application-layer split:
   merge rebuilt analyzer output with unchanged snapshot state
 - `ChangeStatusCalculator`
   symbol diff status and impacted-symbol derivation
+- `ReviewQueryService`
+  snapshot-aware graph query assembly with targeted relation reads for class and method views
 
 ## Main Use Cases
 
@@ -73,6 +75,12 @@ The first implemented server flow should cover:
 - method graph for one class
 - changed symbol list
 - impact scope
+
+Current query-path behavior:
+
+- class graph reads only `EXTENDS`, `IMPLEMENTS`, and `USES_TYPE` relations for the selected snapshot, then trims to indexed type-to-type edges
+- method graph reads only `CALLS` relations whose source and target both belong to the selected class methods
+- query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction
 

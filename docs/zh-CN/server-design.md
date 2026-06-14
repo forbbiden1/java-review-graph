@@ -36,7 +36,7 @@
 - `ReviewQueryService`
   面向快照的类图、方法图与变更列表查询
 - `ChangeSetReviewService`
-  基于单个快照和一组 Git 或手工变更文件生成确定性 review 摘要
+  基于单个快照和 Git 自动、手工文件列表或明确提交区间生成确定性 review 摘要
 - `SnapshotCompareService`
   基于两个持久化快照生成确定性的符号与关系演进摘要
 
@@ -75,7 +75,8 @@
 
 - 类图只读取所需的类型级关系
 - 方法图只读取当前类范围内的调用关系
-- change-set review 基于单快照和一组变更文件生成风险、目标、传播路径和测试建议
+- change-set review 基于单快照和 Git 自动、手工文件列表或 `baseCommit -> targetCommit` 提交区间生成风险、目标、传播路径和测试建议
+- 提交区间 review 只读取两端 commit 的已提交 diff，并保留 rename / move 路径，不会混入当前工作区未提交改动
 - snapshot compare 直接读取两个快照中的持久化符号集和结构关系集，输出符号变化以及 `extends`、`implements`、`uses_type`、`calls`、`overrides` 等关系的新增与删除
 
 ## 持久化方向

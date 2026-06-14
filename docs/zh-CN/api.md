@@ -175,10 +175,24 @@
 }
 ```
 
+或：
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "git",
+  "baseCommit": "abc12345",
+  "targetCommit": "def67890"
+}
+```
+
 当前行为：
 
 - 未传 `snapshotId` 时默认使用最新快照
 - 支持 `changeSource = git` 或 `manual`
+- 支持同时传入 `baseCommit` 和 `targetCommit` 来执行明确的 Git 提交区间 review
+- 提交区间模式会拒绝只传一端 commit，且不能与 `manual` 手工文件列表混用
+- 提交区间模式基于两端 commit 的 `git diff --name-status --find-renames` 收集变更文件和重命名路径，不会带入当前工作区未提交改动
 - 返回变更符号、受影响符号、优先 review 目标、传播路径、测试关注建议和确定性风险摘要
 
 ## `POST /api/projects/{projectId}/review/change-set/markdown`

@@ -109,6 +109,28 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }
 
+    @Test
+    void reviewChangeSetRejectsPartialCommitRange() throws Exception {
+        String projectId = "project-change-set-3";
+        String snapshotId = "snapshot-change-set-3";
+        String now = Instant.now().toString();
+
+        insertProject(projectId, now);
+        insertSnapshot(projectId, snapshotId, now);
+
+        mockMvc.perform(post("/api/projects/{projectId}/review/change-set", projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "snapshotId": "snapshot-change-set-3",
+                                  "changeSource": "git",
+                                  "baseCommit": "abc12345"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Commit-range change-set review requires both baseCommit and targetCommit."));
+    }
+
     private void insertProject(String projectId, String now) {
         jdbcTemplate.update(
                 """

@@ -228,6 +228,17 @@ or:
 }
 ```
 
+or:
+
+```json
+{
+  "snapshotId": "snapshot-1",
+  "changeSource": "git",
+  "baseCommit": "abc12345",
+  "targetCommit": "def67890"
+}
+```
+
 Current behavior:
 
 - resolves `snapshotId` to the latest snapshot when omitted
@@ -235,6 +246,9 @@ Current behavior:
 - defaults `changeSource` to `git` when omitted
 - requires `changedFiles` only for `manual` review requests
 - when `changeSource = git`, reuses the snapshot Git base to collect changed paths from Git
+- accepts `baseCommit` and `targetCommit` together for explicit commit-range review
+- rejects partial commit-range requests or commit-range requests mixed with `manual`
+- commit-range review uses `git diff --name-status --find-renames` between the two commits and ignores workspace-only edits
 - maps changed file paths to changed symbols in the selected snapshot
 - reads persisted symbol-change rows to surface impacted or deleted symbols for review
 - returns a compact summary including changed files, rename pairs, changed symbols, impacted symbols, prioritized review targets, direct propagation paths, a deterministic risk level, and one summary sentence

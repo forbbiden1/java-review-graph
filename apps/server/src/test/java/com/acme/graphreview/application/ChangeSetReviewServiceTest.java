@@ -74,7 +74,7 @@ class ChangeSetReviewServiceTest {
 
         ChangeSetReviewResult result = service.reviewChangeSet(
                 project.id(),
-                new ChangeSetReviewCommand(snapshot.id(), "git", List.of())
+                new ChangeSetReviewCommand(snapshot.id(), "git", List.of(), null, null)
         );
 
         assertEquals(snapshot.id(), result.snapshotId());
@@ -146,7 +146,7 @@ class ChangeSetReviewServiceTest {
 
         ChangeSetReviewMarkdownReport report = service.exportMarkdownReport(
                 project.id(),
-                new ChangeSetReviewCommand(snapshot.id(), "git", List.of())
+                new ChangeSetReviewCommand(snapshot.id(), "git", List.of(), null, null)
         );
 
         assertEquals("change-set-review-project-1-review-baseline-git.md", report.fileName());

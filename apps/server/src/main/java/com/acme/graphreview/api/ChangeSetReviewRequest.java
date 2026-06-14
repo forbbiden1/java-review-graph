@@ -5,6 +5,8 @@ import java.util.List;
 public record ChangeSetReviewRequest(
         String snapshotId,
         String changeSource,
-        List<String> changedFiles
+        List<String> changedFiles,
+        String baseCommit,
+        String targetCommit
 ) {
 }

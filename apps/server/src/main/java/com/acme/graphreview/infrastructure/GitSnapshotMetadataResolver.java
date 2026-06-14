@@ -83,6 +83,26 @@ public class GitSnapshotMetadataResolver {
         );
     }
 
+    public GitChangedFiles resolveCommitRangeChangedFiles(Path rootPath, String baseCommit, String targetCommit) {
+        if (!isGitWorkTree(rootPath)) {
+            return GitChangedFiles.unavailable(
+                    "Commit-range Git change detection is unavailable because the project root is not a Git work tree."
+            );
+        }
+
+        ParsedGitChanges commitRangeChanges = runGitNameStatus(
+                rootPath,
+                List.of("git", "diff", "--name-status", "--find-renames", "-z", baseCommit, targetCommit, "--")
+        );
+
+        return GitChangedFiles.available(
+                commitRangeChanges.paths(),
+                commitRangeChanges.renamedPaths(),
+                buildCommitRangeChangedFilesNote(baseCommit, targetCommit, commitRangeChanges.paths().size()),
+                false
+        );
+    }
+
     private boolean isGitWorkTree(Path rootPath) {
         return runGit(rootPath, List.of("git", "rev-parse", "--is-inside-work-tree"))
                 .map("true"::equalsIgnoreCase)
@@ -304,6 +324,12 @@ public class GitSnapshotMetadataResolver {
 
         return "Incremental Git status collected " + pathCount
                 + " changed path(s) because the repository does not have a HEAD commit yet.";
+    }
+
+    private String buildCommitRangeChangedFilesNote(String baseCommit, String targetCommit, int pathCount) {
+        return "Commit-range Git diff collected " + pathCount
+                + " changed path(s) from commit " + shortenCommit(baseCommit)
+                + " to commit " + shortenCommit(targetCommit) + ".";
     }
 
     private String shortenCommit(String commit) {

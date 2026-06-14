@@ -4,6 +4,7 @@ import {
   exportChangeSetReviewMarkdown,
   type ClassGraph,
   type ChangeSetReviewMarkdownReport,
+  type ChangeSetReviewPayload,
   type ChangeSetReviewResult,
   type SnapshotCompareResult,
   createProject,
@@ -43,7 +44,8 @@ import {
   type ClassGraphDisplayMode,
   type ContextMenuState,
   type ExpandedGraphView,
-  type IndexChangeSource
+  type IndexChangeSource,
+  type ReviewChangeSource
 } from "./app/view-model";
 import {
   buildGraphSceneStorageKey,
@@ -106,9 +108,13 @@ function App() {
   const [importRootPath, setImportRootPath] = useState("C:/Users/29768/Desktop/java-review-graph");
   const [indexMode, setIndexMode] = useState<"full" | "incremental">("full");
   const [indexChangeSource, setIndexChangeSource] = useState<IndexChangeSource>("git");
+  const [reviewChangeSource, setReviewChangeSource] = useState<ReviewChangeSource>("git");
   const [classGraphDisplayMode, setClassGraphDisplayMode] = useState<ClassGraphDisplayMode>("full");
   const [classGraphSearchQuery, setClassGraphSearchQuery] = useState("");
   const [changedFilesText, setChangedFilesText] = useState("");
+  const [reviewChangedFilesText, setReviewChangedFilesText] = useState("");
+  const [reviewBaseCommit, setReviewBaseCommit] = useState("");
+  const [reviewTargetCommit, setReviewTargetCommit] = useState("");
   const [reviewResult, setReviewResult] = useState<ChangeSetReviewResult | null>(null);
   const [reviewMarkdownReport, setReviewMarkdownReport] = useState<ChangeSetReviewMarkdownReport | null>(null);
   const [snapshotCompareBaseId, setSnapshotCompareBaseId] = useState("");
@@ -139,6 +145,7 @@ function App() {
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   const selectedSnapshot = snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? null;
   const manualChangedFiles = parseChangedFilesText(changedFilesText);
+  const reviewManualChangedFiles = parseChangedFilesText(reviewChangedFilesText);
   const snapshotGroups = buildSnapshotGroups(snapshots, settings.language);
   const filteredClassGraph = filterClassGraph(classGraph, classGraphSearchQuery, classGraphDisplayMode);
   const classNodes = filteredClassGraph?.nodes ?? [];
@@ -168,6 +175,11 @@ function App() {
     !selectedProjectId ||
     submittingIndex ||
     (indexMode === "incremental" && indexChangeSource === "manual" && manualChangedFiles.length === 0);
+  const reviewBaseCommitValue = reviewBaseCommit.trim();
+  const reviewTargetCommitValue = reviewTargetCommit.trim();
+  const isReviewInputIncomplete =
+    (reviewChangeSource === "manual" && reviewManualChangedFiles.length === 0) ||
+    (reviewChangeSource === "commitRange" && (!reviewBaseCommitValue || !reviewTargetCommitValue));
 
   useEffect(() => {
     let isMounted = true;
@@ -510,11 +522,7 @@ function App() {
     setSubmittingReview(true);
     setErrorMessage(null);
     try {
-      const result = await reviewChangeSet(selectedProjectId, {
-        snapshotId: selectedSnapshotId,
-        changeSource: indexChangeSource,
-        changedFiles: indexChangeSource === "manual" ? manualChangedFiles : undefined
-      });
+      const result = await reviewChangeSet(selectedProjectId, buildChangeSetReviewPayload(selectedSnapshotId));
       setReviewResult(result);
       setReviewMarkdownReport(null);
       setWorkspaceMessage(copy.messages.reviewFinished(result.risk.level, result.reviewTargets.length));
@@ -538,11 +546,7 @@ function App() {
     setExportingReviewMarkdown(true);
     setErrorMessage(null);
     try {
-      const report = await exportChangeSetReviewMarkdown(selectedProjectId, {
-        snapshotId: selectedSnapshotId,
-        changeSource: indexChangeSource,
-        changedFiles: indexChangeSource === "manual" ? manualChangedFiles : undefined
-      });
+      const report = await exportChangeSetReviewMarkdown(selectedProjectId, buildChangeSetReviewPayload(selectedSnapshotId));
       setReviewMarkdownReport(report);
       downloadMarkdownReport(report);
       setWorkspaceMessage(copy.messages.markdownExported(report.fileName));
@@ -551,6 +555,30 @@ function App() {
     } finally {
       setExportingReviewMarkdown(false);
     }
+  }
+
+  function buildChangeSetReviewPayload(snapshotId: string): ChangeSetReviewPayload {
+    if (reviewChangeSource === "manual") {
+      return {
+        snapshotId,
+        changeSource: "manual",
+        changedFiles: reviewManualChangedFiles
+      };
+    }
+
+    if (reviewChangeSource === "commitRange") {
+      return {
+        snapshotId,
+        changeSource: "git",
+        baseCommit: reviewBaseCommitValue,
+        targetCommit: reviewTargetCommitValue
+      };
+    }
+
+    return {
+      snapshotId,
+      changeSource: "git"
+    };
   }
 
   async function handleRunSnapshotCompare() {
@@ -1194,7 +1222,7 @@ function App() {
                         type="button"
                         className="secondary-button"
                         onClick={() => void handleRunChangeSetReview()}
-                        disabled={submittingReview || !selectedProjectId || !selectedSnapshotId}
+                        disabled={submittingReview || !selectedProjectId || !selectedSnapshotId || isReviewInputIncomplete}
                       >
                         {submittingReview ? copy.states.reviewing : copy.buttons.runReview}
                       </button>
@@ -1202,15 +1230,83 @@ function App() {
                         type="button"
                         className="secondary-button"
                         onClick={() => void handleExportChangeSetReviewMarkdown()}
-                        disabled={exportingReviewMarkdown || !selectedProjectId || !selectedSnapshotId}
+                        disabled={exportingReviewMarkdown || !selectedProjectId || !selectedSnapshotId || isReviewInputIncomplete}
                       >
                         {exportingReviewMarkdown ? copy.states.exportingMarkdown : copy.buttons.exportMarkdown}
                       </button>
                     </div>
                   }
                 >
+                  <div className="stack-form">
+                    <label className="field">
+                      <span>{copy.fields.reviewSource}</span>
+                      <div className="segmented-control" role="tablist" aria-label={copy.fields.reviewSource}>
+                        <button
+                          type="button"
+                          className={reviewChangeSource === "git" ? "is-active" : ""}
+                          onClick={() => setReviewChangeSource("git")}
+                        >
+                          {copy.buttons.gitAuto}
+                        </button>
+                        <button
+                          type="button"
+                          className={reviewChangeSource === "manual" ? "is-active" : ""}
+                          onClick={() => setReviewChangeSource("manual")}
+                        >
+                          {copy.buttons.manual}
+                        </button>
+                        <button
+                          type="button"
+                          className={reviewChangeSource === "commitRange" ? "is-active" : ""}
+                          onClick={() => setReviewChangeSource("commitRange")}
+                        >
+                          {copy.buttons.commitRange}
+                        </button>
+                      </div>
+                    </label>
+
+                    {reviewChangeSource === "manual" ? (
+                      <>
+                        <label className="field">
+                          <span>{copy.fields.changedFiles}</span>
+                          <textarea
+                            value={reviewChangedFilesText}
+                            onChange={(event) => setReviewChangedFilesText(event.target.value)}
+                            placeholder={copy.placeholders.changedFiles}
+                            rows={5}
+                          />
+                        </label>
+                        <p className="helper-copy">{copy.copy.reviewManualHint}</p>
+                      </>
+                    ) : null}
+
+                    {reviewChangeSource === "commitRange" ? (
+                      <>
+                        <label className="field">
+                          <span>{copy.fields.baseCommit}</span>
+                          <input
+                            value={reviewBaseCommit}
+                            onChange={(event) => setReviewBaseCommit(event.target.value)}
+                            placeholder={copy.placeholders.baseCommit}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>{copy.fields.targetCommit}</span>
+                          <input
+                            value={reviewTargetCommit}
+                            onChange={(event) => setReviewTargetCommit(event.target.value)}
+                            placeholder={copy.placeholders.targetCommit}
+                          />
+                        </label>
+                        <p className="helper-copy">{copy.copy.reviewCommitRangeHint}</p>
+                      </>
+                    ) : null}
+
+                    {reviewChangeSource === "git" ? <p className="helper-copy">{copy.copy.reviewGitHint}</p> : null}
+                  </div>
+
                   <ChangeSetReviewPanel
-                    changedFiles={indexChangeSource === "manual" ? manualChangedFiles : null}
+                    changedFiles={reviewChangeSource === "manual" ? reviewManualChangedFiles : null}
                     emptyBody={copy.copy.reviewExportEmptyBody}
                     emptyTitle={copy.copy.reviewExportEmptyTitle}
                     language={settings.language}
@@ -1219,7 +1315,7 @@ function App() {
                     result={reviewResult}
                     reviewTargetsLabel={copy.copy.reviewTargetsLabel}
                     reviewSourceLabel={copy.fields.reviewSource}
-                    reviewSourceValue={indexChangeSource}
+                    reviewSourceValue={reviewChangeSource}
                   />
                 </Panel>
 

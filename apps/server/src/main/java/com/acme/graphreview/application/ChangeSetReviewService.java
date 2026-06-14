@@ -143,6 +143,20 @@ public class ChangeSetReviewService {
 
     private GitChangedFiles resolveChangedFiles(RegisteredProject project, ProjectSnapshot snapshot, ChangeSetReviewCommand command) {
         String changeSource = normalizeChangeSource(command.changeSource());
+        String baseCommit = normalizeNullableText(command.baseCommit());
+        String targetCommit = normalizeNullableText(command.targetCommit());
+        boolean hasCommitRange = baseCommit != null || targetCommit != null;
+
+        if (hasCommitRange) {
+            if ("manual".equals(changeSource)) {
+                throw new ProjectValidationException("Commit-range change-set review does not support manual changed files.");
+            }
+            if (baseCommit == null || targetCommit == null) {
+                throw new ProjectValidationException("Commit-range change-set review requires both baseCommit and targetCommit.");
+            }
+            return gitSnapshotMetadataResolver.resolveCommitRangeChangedFiles(Path.of(project.rootPath()), baseCommit, targetCommit);
+        }
+
         if ("manual".equals(changeSource)) {
             if (command.changedFiles() == null || command.changedFiles().isEmpty()) {
                 throw new ProjectValidationException("Manual change-set review requires at least one changed file.");
@@ -161,6 +175,14 @@ public class ChangeSetReviewService {
             throw new ProjectValidationException("Unsupported change-set review source: " + rawChangeSource);
         }
         return normalized;
+    }
+
+    private String normalizeNullableText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 
     private String normalizeProjectPath(String projectRootPath, String rawPath) {
@@ -468,7 +490,9 @@ public class ChangeSetReviewService {
     public record ChangeSetReviewCommand(
             String snapshotId,
             String changeSource,
-            List<String> changedFiles
+            List<String> changedFiles,
+            String baseCommit,
+            String targetCommit
     ) {
     }
 

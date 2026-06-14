@@ -9,7 +9,7 @@ import type {
 } from "../api/client";
 import { formatEdgeTypeLabel, formatStatusLabel } from "../i18n";
 import type { LanguageMode } from "../platform";
-import type { IndexChangeSource, SnapshotDiagnosticsCopy, SnapshotGroup } from "./view-model";
+import type { ReviewChangeSource, SnapshotDiagnosticsCopy, SnapshotGroup } from "./view-model";
 import {
   buildChangeFilterOptions,
   compactSymbolKey,
@@ -600,7 +600,7 @@ type ChangeSetReviewPanelProps = {
   report: ChangeSetReviewMarkdownReport | null;
   result: ChangeSetReviewResult | null;
   reviewSourceLabel: string;
-  reviewSourceValue: IndexChangeSource;
+  reviewSourceValue: ReviewChangeSource;
   reviewTargetsLabel: string;
 };
 
@@ -625,7 +625,7 @@ export function ChangeSetReviewPanel({
   return (
     <div className="review-report-shell">
       <div className="review-report-meta">
-        <DiagnosticFact label={reviewSourceLabel} value={reviewSourceValue === "manual" ? "manual" : "git"} />
+        <DiagnosticFact label={reviewSourceLabel} value={formatReviewSourceValue(reviewSourceValue)} />
         <DiagnosticFact label="Risk" value={`${result.risk.level} (${result.risk.score})`} />
         <DiagnosticFact label="Targets" value={String(result.reviewTargets.length)} />
         <DiagnosticFact label="Files" value={String(result.changedFiles.length)} />
@@ -732,7 +732,11 @@ export function ChangeSetReviewPanel({
         )}
       </section>
 
-      <DiagnosticPathSection title={changedFiles ? "Manual Changed Files" : "Changed Files"} paths={result.changedFiles} emptyLabel="None" />
+      <DiagnosticPathSection
+        title={formatReviewChangedFilesTitle(reviewSourceValue, changedFiles)}
+        paths={result.changedFiles}
+        emptyLabel="None"
+      />
 
       {report ? (
         <section className="review-report-section">
@@ -745,6 +749,23 @@ export function ChangeSetReviewPanel({
       ) : null}
     </div>
   );
+}
+
+function formatReviewSourceValue(reviewSourceValue: ReviewChangeSource) {
+  if (reviewSourceValue === "commitRange") {
+    return "commit range";
+  }
+  return reviewSourceValue;
+}
+
+function formatReviewChangedFilesTitle(reviewSourceValue: ReviewChangeSource, changedFiles: string[] | null) {
+  if (changedFiles) {
+    return "Manual Changed Files";
+  }
+  if (reviewSourceValue === "commitRange") {
+    return "Commit Range Changed Files";
+  }
+  return "Changed Files";
 }
 
 export function DiagnosticFact({ label, value }: { label: string; value: string }) {

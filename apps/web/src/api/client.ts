@@ -131,6 +131,14 @@ export type ChangeSetReviewMarkdownReport = {
   markdown: string;
 };
 
+export type ChangeSetReviewPayload = {
+  snapshotId?: string | null;
+  changeSource?: "git" | "manual";
+  changedFiles?: string[];
+  baseCommit?: string;
+  targetCommit?: string;
+};
+
 export type SnapshotCompareRef = {
   id: string;
   displayName: string;
@@ -351,7 +359,7 @@ export function getMethodGraph(projectId: string, classId: string, snapshotId?: 
 
 export function reviewChangeSet(
   projectId: string,
-  payload: { snapshotId?: string | null; changeSource?: "git" | "manual"; changedFiles?: string[] }
+  payload: ChangeSetReviewPayload
 ) {
   return request<ChangeSetReviewResult>(`/api/projects/${encodeURIComponent(projectId)}/review/change-set`, {
     method: "POST",
@@ -361,7 +369,7 @@ export function reviewChangeSet(
 
 export function exportChangeSetReviewMarkdown(
   projectId: string,
-  payload: { snapshotId?: string | null; changeSource?: "git" | "manual"; changedFiles?: string[] }
+  payload: ChangeSetReviewPayload
 ) {
   return request<ChangeSetReviewMarkdownReport>(`/api/projects/${encodeURIComponent(projectId)}/review/change-set/markdown`, {
     method: "POST",

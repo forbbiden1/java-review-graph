@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
@@ -122,6 +123,35 @@ class GitSnapshotMetadataResolverTest {
         assertTrue(changedFiles.available());
         assertEquals(List.of("OldName.java", "NewName.java"), changedFiles.paths());
         assertEquals(List.of("OldName.java -> NewName.java"), changedFiles.renamedPaths());
+    }
+
+    @Test
+    void resolveCommitRangeChangedFilesCollectsCommittedDiffOnly() throws IOException, InterruptedException {
+        assumeGitAvailable();
+        initializeRepository(tempDir);
+
+        Files.writeString(tempDir.resolve("Base.java"), "class Base {}");
+        Files.writeString(tempDir.resolve("OldName.java"), "class OldName {}");
+        runGit(tempDir, "git", "add", "Base.java", "OldName.java");
+        runGit(tempDir, "git", "commit", "-m", "Base snapshot");
+        String baseCommit = readGit(tempDir, "git", "rev-parse", "HEAD");
+
+        runGit(tempDir, "git", "mv", "OldName.java", "Moved.java");
+        Files.writeString(tempDir.resolve("Base.java"), "class Base { int value = 1; }");
+        runGit(tempDir, "git", "add", "Moved.java", "Base.java");
+        runGit(tempDir, "git", "commit", "-m", "Rename and modify");
+        String targetCommit = readGit(tempDir, "git", "rev-parse", "HEAD");
+
+        Files.writeString(tempDir.resolve("WorkspaceOnly.java"), "class WorkspaceOnly {}");
+
+        GitChangedFiles changedFiles = resolver.resolveCommitRangeChangedFiles(tempDir, baseCommit, targetCommit);
+
+        assertTrue(changedFiles.available());
+        assertEquals(new LinkedHashSet<>(List.of("OldName.java", "Moved.java", "Base.java")), new LinkedHashSet<>(changedFiles.paths()));
+        assertEquals(List.of("OldName.java -> Moved.java"), changedFiles.renamedPaths());
+        assertFalse(changedFiles.includesWorkspaceChanges());
+        assertTrue(changedFiles.note().contains(baseCommit.substring(0, 8)));
+        assertTrue(changedFiles.note().contains(targetCommit.substring(0, 8)));
     }
 
     @Test

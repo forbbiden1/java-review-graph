@@ -4,6 +4,8 @@ export type ClassGraphDisplayMode = "full" | "incremental";
 
 export type IndexChangeSource = "git" | "manual";
 
+export type ReviewChangeSource = IndexChangeSource | "commitRange";
+
 export type ExpandedGraphView = "class" | "method" | null;
 
 export type ContextMenuState =

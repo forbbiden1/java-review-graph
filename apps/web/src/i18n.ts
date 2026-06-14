@@ -42,6 +42,7 @@ export type AppCopy = {
     back: string;
     cancel: string;
     close: string;
+    commitRange: string;
     deleteProject: string;
     expand: string;
     gitAuto: string;
@@ -57,6 +58,7 @@ export type AppCopy = {
   };
   fields: {
     apiBaseUrl: string;
+    baseCommit: string;
     changedFiles: string;
     incrementalSource: string;
     language: string;
@@ -64,12 +66,15 @@ export type AppCopy = {
     reviewSource: string;
     rootPath: string;
     runtime: string;
+    targetCommit: string;
   };
   placeholders: {
     apiBaseUrl: string;
+    baseCommit: string;
     changedFiles: string;
     name: string;
     rootPath: string;
+    targetCommit: string;
   };
   copy: {
     apiBaseUrlHintDesktop: string;
@@ -98,8 +103,11 @@ export type AppCopy = {
     methodGraphEmptyTitle: string;
     projectsEmptyBody: string;
     projectsEmptyTitle: string;
+    reviewCommitRangeHint: string;
     reviewExportEmptyBody: string;
     reviewExportEmptyTitle: string;
+    reviewGitHint: string;
+    reviewManualHint: string;
     reviewMarkdownLabel: string;
     reviewTargetsLabel: string;
     settingsSubtitle: string;
@@ -193,6 +201,7 @@ const EN_COPY: AppCopy = {
     back: "Back",
     cancel: "Cancel",
     close: "Close",
+    commitRange: "Commit Range",
     deleteProject: "Delete Project",
     expand: "Expand",
     gitAuto: "Git Auto",
@@ -208,19 +217,23 @@ const EN_COPY: AppCopy = {
   },
   fields: {
     apiBaseUrl: "Backend API Base URL",
+    baseCommit: "Base Commit",
     changedFiles: "Changed Files",
     incrementalSource: "Change Source",
     language: "Language",
     name: "Name",
     reviewSource: "Review Source",
     rootPath: "Root Path",
-    runtime: "Runtime"
+    runtime: "Runtime",
+    targetCommit: "Target Commit"
   },
   placeholders: {
     apiBaseUrl: "http://127.0.0.1:8080",
+    baseCommit: "HEAD~1",
     changedFiles: "src/main/java/com/example/user/UserService.java",
     name: "demo-project",
-    rootPath: "C:/repo/demo-project"
+    rootPath: "C:/repo/demo-project",
+    targetCommit: "HEAD"
   },
   copy: {
     apiBaseUrlHintDesktop: "Leave blank to use the desktop default `http://127.0.0.1:8080`.",
@@ -255,8 +268,12 @@ const EN_COPY: AppCopy = {
     methodGraphEmptyTitle: "No method graph loaded",
     projectsEmptyBody: "Import a local Java repository to create the first review workspace.",
     projectsEmptyTitle: "No projects yet",
+    reviewCommitRangeHint: "Commit Range compares two explicit Git commits and ignores current workspace-only edits.",
     reviewExportEmptyBody: "Run a change-set review to inspect risk, targets, and export-ready Markdown.",
     reviewExportEmptyTitle: "No review report yet",
+    reviewGitHint:
+      "Git Auto reuses the selected snapshot Git base and includes current workspace changes when they exist.",
+    reviewManualHint: "Manual review accepts one relative file path per line.",
     reviewMarkdownLabel: "Markdown Preview",
     reviewTargetsLabel: "Priority Targets",
     settingsSubtitle: "Desktop preferences and language controls."
@@ -352,6 +369,7 @@ const ZH_COPY = {
   buttons: {
     cancel: "取消",
     close: "关闭",
+    commitRange: "提交区间",
     gitAuto: "Git 自动",
     importProject: "导入项目",
     incremental: "增量",
@@ -363,18 +381,23 @@ const ZH_COPY = {
   },
   fields: {
     apiBaseUrl: "后端 API 地址",
+    baseCommit: "起始提交",
     changedFiles: "变更文件",
     incrementalSource: "变更来源",
     language: "界面语言",
     name: "项目名称",
+    reviewSource: "Review 来源",
     rootPath: "项目根路径",
-    runtime: "运行模式"
+    runtime: "运行模式",
+    targetCommit: "目标提交"
   },
   placeholders: {
     apiBaseUrl: "http://127.0.0.1:8080",
+    baseCommit: "HEAD~1",
     changedFiles: "src/main/java/com/example/user/UserService.java",
     name: "demo-project",
-    rootPath: "C:/repo/demo-project"
+    rootPath: "C:/repo/demo-project",
+    targetCommit: "HEAD"
   },
   copy: {
     apiBaseUrlHintDesktop: "留空时使用桌面端默认地址 `http://127.0.0.1:8080`。",
@@ -409,6 +432,9 @@ const ZH_COPY = {
     methodGraphEmptyTitle: "还没有方法图谱",
     projectsEmptyBody: "导入一个本地 Java 仓库后，这里会建立第一份评审工作区。",
     projectsEmptyTitle: "还没有项目",
+    reviewCommitRangeHint: "提交区间模式会对比两个明确的 Git 提交，不会带入当前仅存在于工作区的改动。",
+    reviewGitHint: "Git 自动会复用所选快照的 Git 基线，并在存在时带上当前工作区改动。",
+    reviewManualHint: "手工评审按行输入相对路径，每行一个文件。",
     settingsSubtitle: "桌面端偏好项和语言切换。"
   },
   messages: {

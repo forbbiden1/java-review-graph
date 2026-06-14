@@ -103,7 +103,9 @@ public class ProjectController {
                 new com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand(
                         normalizedRequest.snapshotId(),
                         normalizedRequest.changeSource(),
-                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles()
+                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles(),
+                        normalizedRequest.baseCommit(),
+                        normalizedRequest.targetCommit()
                 )
         ));
     }
@@ -119,7 +121,9 @@ public class ProjectController {
                 new com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewCommand(
                         normalizedRequest.snapshotId(),
                         normalizedRequest.changeSource(),
-                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles()
+                        normalizedRequest.changedFiles() == null ? List.of() : normalizedRequest.changedFiles(),
+                        normalizedRequest.baseCommit(),
+                        normalizedRequest.targetCommit()
                 )
         ));
     }
@@ -243,7 +247,7 @@ public class ProjectController {
 
     private ChangeSetReviewRequest normalizeChangeSetReviewRequest(ChangeSetReviewRequest request) {
         return request == null
-                ? new ChangeSetReviewRequest(null, null, List.of())
+                ? new ChangeSetReviewRequest(null, null, List.of(), null, null)
                 : request;
     }
 }

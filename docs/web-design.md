@@ -78,3 +78,4 @@ Current implementation notes:
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
 - the change-set review panel also shows direct propagation paths so users can explain why one changed symbol affects a downstream review target
 - the same panel now highlights deterministic test-focus suggestions so the demo can end with concrete regression or integration targets
+- `App.tsx` is now limited to workspace state and orchestration; shared panels live in `src/app/components.tsx`, while graph, snapshot, and review display helpers live in `src/app/utils.ts`

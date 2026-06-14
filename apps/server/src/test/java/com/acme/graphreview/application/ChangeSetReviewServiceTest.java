@@ -77,7 +77,12 @@ class ChangeSetReviewServiceTest {
         assertEquals(changedType.symbolKey(), result.changedSymbols().get(0).symbolKey());
         assertEquals(1, result.impactedSymbols().size());
         assertEquals(impactedType.symbolKey(), result.impactedSymbols().get(0).symbolKey());
-        assertTrue(result.summary().contains("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s)"));
+        assertEquals("medium", result.risk().riskLevel());
+        assertEquals(4, result.risk().riskScore());
+        assertTrue(result.risk().reasons().contains("Public API or deleted symbol changed."));
+        assertTrue(result.risk().reasons().contains("One-hop impacted symbols were found."));
+        assertEquals(changedType.symbolKey(), result.reviewTargets().get(0).symbolKey());
+        assertTrue(result.summary().contains("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s). Risk level: medium."));
     }
 
     private static SymbolRecord symbol(

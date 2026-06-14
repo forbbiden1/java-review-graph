@@ -57,7 +57,11 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.changedSymbols[0].reviewRole").value("changed"))
                 .andExpect(jsonPath("$.impactedSymbols[0].symbolKey").value("type:demo.Controller"))
                 .andExpect(jsonPath("$.impactedSymbols[0].reviewRole").value("impacted"))
-                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("1 changed file(s), 1 changed symbol(s), and 1 impacted symbol(s)")));
+                .andExpect(jsonPath("$.reviewTargets[0].symbolKey").value("type:demo.Service"))
+                .andExpect(jsonPath("$.risk.level").value("medium"))
+                .andExpect(jsonPath("$.risk.score").value(4))
+                .andExpect(jsonPath("$.risk.reasons[0]").value("Public API or deleted symbol changed."))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }
 
     private void insertProject(String projectId, String now) {

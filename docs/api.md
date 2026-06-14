@@ -223,4 +223,4 @@ Current behavior:
 - when `changeSource = git`, reuses the snapshot Git base to collect changed paths from Git
 - maps changed file paths to changed symbols in the selected snapshot
 - reads persisted symbol-change rows to surface impacted or deleted symbols for review
-- returns a compact summary including changed files, rename pairs, changed symbols, impacted symbols, and one summary sentence
+- returns a compact summary including changed files, rename pairs, changed symbols, impacted symbols, prioritized review targets, a deterministic risk level, and one summary sentence

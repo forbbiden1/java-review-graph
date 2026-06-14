@@ -14,6 +14,8 @@ public record ChangeSetReviewResponse(
         boolean includesWorkspaceChanges,
         List<ChangeSetReviewSymbolResponse> changedSymbols,
         List<ChangeSetReviewSymbolResponse> impactedSymbols,
+        List<ChangeSetReviewSymbolResponse> reviewTargets,
+        RiskResponse risk,
         String summary
 ) {
     public static ChangeSetReviewResponse from(ChangeSetReviewResult result) {
@@ -27,8 +29,20 @@ public record ChangeSetReviewResponse(
                 result.includesWorkspaceChanges(),
                 result.changedSymbols().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
                 result.impactedSymbols().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
+                result.reviewTargets().stream().map(ChangeSetReviewSymbolResponse::from).toList(),
+                RiskResponse.from(result.risk()),
                 result.summary()
         );
+    }
+
+    public record RiskResponse(
+            String level,
+            int score,
+            List<String> reasons
+    ) {
+        private static RiskResponse from(com.acme.graphreview.application.ChangeSetReviewService.ChangeSetRiskSummary risk) {
+            return new RiskResponse(risk.riskLevel(), risk.riskScore(), risk.reasons());
+        }
     }
 
     public record ChangeSetReviewSymbolResponse(

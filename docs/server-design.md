@@ -84,6 +84,7 @@ Current query-path behavior:
 - class graph reads only `EXTENDS`, `IMPLEMENTS`, and `USES_TYPE` relations for the selected snapshot, then trims to indexed type-to-type edges
 - method graph reads only `CALLS` relations whose source and target both belong to the selected class methods
 - change-set review reads one snapshot plus one Git or manual changed-file set, then maps file paths to changed symbols and persisted impacted symbols
+- change-set review also derives a deterministic risk summary from changed statuses, impacted count, and deleted-symbol signals
 - query endpoints avoid loading the full snapshot relation set when a narrower relation slice is enough
 
 ## Persistence Direction

@@ -53,6 +53,7 @@ changed file list
 
 Normalize the changed `.java` paths, rebuild those files, and include one-hop related files discovered from the previous snapshot relations.
 If a changed Java file was deleted, remove its old records from the assembled snapshot and rebuild its surviving one-hop neighbors when possible.
+During relation extraction, prefer binding-backed targets first and emit lower-confidence fallback relations only when exact binding is unavailable.
 
 ### Build file change
 

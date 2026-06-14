@@ -74,15 +74,16 @@ class JavaAnalysisFacadeTest {
 
         assertTrue(
                 snapshot.relations().stream()
-                        .anyMatch(relation -> isUsesTypeRelation(relation, reviewTargetKey, dependencyKey)),
+                        .anyMatch(relation -> isUsesTypeRelation(relation, reviewTargetKey, dependencyKey, "exact")),
                 "expected a uses_type edge from ReviewTarget to Dependency"
         );
     }
 
-    private boolean isUsesTypeRelation(RelationRecord relation, String sourceKey, String targetKey) {
+    private boolean isUsesTypeRelation(RelationRecord relation, String sourceKey, String targetKey, String confidence) {
         return relation.relationType() == RelationType.USES_TYPE
                 && relation.sourceSymbolKey().equals(sourceKey)
-                && relation.targetSymbolKey().equals(targetKey);
+                && relation.targetSymbolKey().equals(targetKey)
+                && relation.confidence().equals(confidence);
     }
 
     @Test
@@ -169,6 +170,82 @@ class JavaAnalysisFacadeTest {
                 snapshot.relations().stream()
                         .anyMatch(relation -> isCallsRelation(relation, reviewMethodKey, helperMethodKey, "possible")),
                 "expected a calls edge from ReviewTarget.review to Helper.assist but got " + snapshot.relations()
+        );
+    }
+
+    @Test
+    void analyzeExtractsExactMethodCallRelationsForOverloadedTargets() throws IOException {
+        Path sourceRoot = tempDir.resolve(Path.of("src", "main", "java", "com", "example"));
+        Files.createDirectories(sourceRoot);
+        Files.writeString(sourceRoot.resolve("Dependency.java"), """
+                package com.example;
+
+                class Dependency {
+                }
+                """);
+        Files.writeString(sourceRoot.resolve("Helper.java"), """
+                package com.example;
+
+                class Helper {
+                    void assist(String input) {
+                    }
+
+                    void assist(Dependency input) {
+                    }
+                }
+                """);
+        Files.writeString(sourceRoot.resolve("ReviewTarget.java"), """
+                package com.example;
+
+                class ReviewTarget {
+                    void review(Helper helper, Dependency dependency) {
+                        helper.assist(dependency);
+                    }
+                }
+                """);
+
+        JavaAnalysisFacade facade = new JavaAnalysisFacade();
+        AnalysisSnapshot snapshot = facade.analyze(
+                new ProjectDescriptor(
+                        "project-1",
+                        "maven",
+                        tempDir,
+                        List.of(tempDir.resolve(Path.of("src", "main", "java"))),
+                        List.of(tempDir)
+                ),
+                new AnalysisRequest("snapshot-4", false, List.of())
+        );
+
+        String reviewMethodKey = snapshot.symbols().stream()
+                .filter(symbol -> symbol.symbolType() == SymbolType.METHOD)
+                .filter(symbol -> symbol.signature().equals("com.example.ReviewTarget#review(Helper, Dependency)"))
+                .map(SymbolRecord::symbolKey)
+                .findFirst()
+                .orElseThrow();
+        String helperDependencyMethodKey = snapshot.symbols().stream()
+                .filter(symbol -> symbol.symbolType() == SymbolType.METHOD)
+                .filter(symbol -> symbol.signature().equals("com.example.Helper#assist(Dependency)"))
+                .map(SymbolRecord::symbolKey)
+                .findFirst()
+                .orElseThrow();
+        String helperStringMethodKey = snapshot.symbols().stream()
+                .filter(symbol -> symbol.symbolType() == SymbolType.METHOD)
+                .filter(symbol -> symbol.signature().equals("com.example.Helper#assist(String)"))
+                .map(SymbolRecord::symbolKey)
+                .findFirst()
+                .orElseThrow();
+
+        assertTrue(
+                snapshot.relations().stream()
+                        .anyMatch(relation -> isCallsRelation(relation, reviewMethodKey, helperDependencyMethodKey, "exact")),
+                "expected an exact calls edge from ReviewTarget.review to Helper.assist(Dependency)"
+        );
+        assertFalse(
+                snapshot.relations().stream()
+                        .anyMatch(relation -> relation.relationType() == RelationType.CALLS
+                                && relation.sourceSymbolKey().equals(reviewMethodKey)
+                                && relation.targetSymbolKey().equals(helperStringMethodKey)),
+                "did not expect ReviewTarget.review to resolve to Helper.assist(String)"
         );
     }
 

@@ -82,11 +82,13 @@ It already performs a local AST scan and produces:
 - type symbols
 - method symbols
 - `declares`, `extends`, `implements`, and `uses_type` relations
-- same-class local `calls` relations when they can be matched by name and arity
+- binding-backed `extends`, `implements`, and `uses_type` relations when JDT can resolve the target
+- cross-type `calls` relations when method bindings or stable owner-plus-signature matching can resolve the target
 - incremental file-subset scans when the server passes an explicit rebuild list
 
 Current limitations:
 
-- no binding resolution yet
-- no cross-type method call resolution yet
+- binding quality still depends on the local source/classpath completeness
+- unresolved third-party or incomplete-classpath targets still fall back to lower-confidence relation output
+- overload and dispatch resolution still prefers declared target signatures, not runtime polymorphism
 - impact propagation is still orchestrated in the server layer, not inside the analyzer module

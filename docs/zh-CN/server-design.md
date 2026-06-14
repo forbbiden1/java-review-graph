@@ -24,6 +24,17 @@
 - `infrastructure`
   持久化、文件访问和分析器集成适配
 
+当前 `application` 层的职责拆分：
+
+- `ProjectIndexService`
+  顶层索引用例编排
+- `IncrementalPlanner`
+  变更文件解析、增量回退规则和重建范围规划
+- `SnapshotAssembler`
+  把本次重建结果和旧快照中的未变化状态组装成新快照
+- `ChangeStatusCalculator`
+  计算 symbol diff 状态和受影响符号
+
 ## 主要用例
 
 ### 项目导入

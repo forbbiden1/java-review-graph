@@ -86,9 +86,10 @@ public class JavaAnalysisFacade {
         List<SymbolRecord> symbols = new ArrayList<>();
         List<PendingTypeRelation> pendingTypeRelations = new ArrayList<>();
         List<PendingMethodCall> pendingMethodCalls = new ArrayList<>();
+        List<MethodDeclarationReference> methodDeclarations = new ArrayList<>();
 
         for (Path javaFile : javaFiles) {
-            analyzeFile(descriptor, javaFile, files, symbols, pendingTypeRelations, pendingMethodCalls);
+            analyzeFile(descriptor, javaFile, files, symbols, pendingTypeRelations, pendingMethodCalls, methodDeclarations);
         }
 
         Map<String, String> typeKeyByQualifiedName = new HashMap<>();
@@ -99,24 +100,15 @@ public class JavaAnalysisFacade {
                 typeQualifiedNameBySymbolKey.put(symbol.symbolKey(), symbol.qualifiedName());
             }
         }
-        Map<String, String> methodKeyByNameAndArity = new HashMap<>();
-        for (SymbolRecord symbol : symbols) {
-            if (symbol.symbolType() == SymbolType.METHOD) {
-                String ownerQualifiedTypeName = typeQualifiedNameBySymbolKey.get(symbol.parentSymbolKey());
-                if (ownerQualifiedTypeName != null) {
-                    methodKeyByNameAndArity.put(
-                            methodIndexKey(ownerQualifiedTypeName, symbol.name(), methodArity(symbol.signature())),
-                            symbol.symbolKey()
-                    );
-                }
-            }
-        }
+        MethodSymbolIndex methodSymbolIndex = MethodSymbolIndex.build(methodDeclarations);
 
         List<RelationRecord> relations = new ArrayList<>();
         for (PendingTypeRelation relation : pendingTypeRelations) {
             relations.add(new RelationRecord(
                     relation.sourceSymbolKey(),
-                    resolveTypeTargetKey(relation.targetQualifiedName(), typeKeyByQualifiedName),
+                    relation.relationType() == RelationType.DECLARES
+                            ? relation.targetQualifiedName()
+                            : resolveTypeTargetKey(relation.targetQualifiedName(), typeKeyByQualifiedName),
                     relation.relationType(),
                     relation.confidence(),
                     relation.filePath(),
@@ -124,9 +116,7 @@ public class JavaAnalysisFacade {
             ));
         }
         for (PendingMethodCall methodCall : pendingMethodCalls) {
-            String targetMethodKey = methodKeyByNameAndArity.get(
-                    methodIndexKey(methodCall.targetTypeQualifiedName(), methodCall.targetMethodName(), methodCall.argumentCount())
-            );
+            String targetMethodKey = methodSymbolIndex.resolve(methodCall);
             if (targetMethodKey != null) {
                 relations.add(new RelationRecord(
                         methodCall.sourceMethodSymbolKey(),
@@ -161,7 +151,8 @@ public class JavaAnalysisFacade {
             List<SourceFileRecord> files,
             List<SymbolRecord> symbols,
             List<PendingTypeRelation> pendingTypeRelations,
-            List<PendingMethodCall> pendingMethodCalls
+            List<PendingMethodCall> pendingMethodCalls,
+            List<MethodDeclarationReference> methodDeclarations
     ) {
         String content = readFile(javaFile);
         CompilationUnit compilationUnit = parseCompilationUnit(descriptor, javaFile, content);
@@ -173,7 +164,8 @@ public class JavaAnalysisFacade {
                 compilationUnit,
                 symbols,
                 pendingTypeRelations,
-                pendingMethodCalls
+                pendingMethodCalls,
+                methodDeclarations
         );
         compilationUnit.accept(visitor);
 
@@ -302,19 +294,6 @@ public class JavaAnalysisFacade {
         return typeKeyByQualifiedName.getOrDefault(targetQualifiedName, "external:type:" + targetQualifiedName);
     }
 
-    private int methodArity(String signature) {
-        int start = signature.indexOf('(');
-        int end = signature.indexOf(')');
-        if (start < 0 || end < 0 || end <= start + 1) {
-            return 0;
-        }
-        return (int) signature.substring(start + 1, end).chars().filter(ch -> ch == ',').count() + 1;
-    }
-
-    private String methodIndexKey(String parentQualifiedTypeName, String methodName, int arity) {
-        return parentQualifiedTypeName + "|" + methodName + "|" + arity;
-    }
-
     private List<RelationRecord> deduplicateRelations(List<RelationRecord> relations) {
         Map<String, RelationRecord> uniqueRelations = new LinkedHashMap<>();
         for (RelationRecord relation : relations) {
@@ -341,6 +320,7 @@ public class JavaAnalysisFacade {
         private final List<SymbolRecord> symbols;
         private final List<PendingTypeRelation> pendingTypeRelations;
         private final List<PendingMethodCall> pendingMethodCalls;
+        private final List<MethodDeclarationReference> methodDeclarations;
         private final Deque<TypeContext> typeStack = new ArrayDeque<>();
         private final Deque<MethodContext> methodStack = new ArrayDeque<>();
         private final Map<String, String> exactImports = new LinkedHashMap<>();
@@ -353,7 +333,8 @@ public class JavaAnalysisFacade {
                 CompilationUnit compilationUnit,
                 List<SymbolRecord> symbols,
                 List<PendingTypeRelation> pendingTypeRelations,
-                List<PendingMethodCall> pendingMethodCalls
+                List<PendingMethodCall> pendingMethodCalls,
+                List<MethodDeclarationReference> methodDeclarations
         ) {
             this.relativeFilePath = relativeFilePath;
             this.moduleName = moduleName;
@@ -361,6 +342,7 @@ public class JavaAnalysisFacade {
             this.symbols = symbols;
             this.pendingTypeRelations = pendingTypeRelations;
             this.pendingMethodCalls = pendingMethodCalls;
+            this.methodDeclarations = methodDeclarations;
             collectImports();
         }
 
@@ -486,6 +468,12 @@ public class JavaAnalysisFacade {
                     sha256(signature),
                     sha256(signature + "\n" + implText),
                     ChangeStatus.UNCHANGED
+            ));
+            methodDeclarations.add(new MethodDeclarationReference(
+                    symbolKey,
+                    typeContext.qualifiedName(),
+                    methodName,
+                    resolveMethodLookupParameterTypes(node)
             ));
             pendingTypeRelations.add(new PendingTypeRelation(
                     typeContext.symbolKey(),
@@ -644,30 +632,13 @@ public class JavaAnalysisFacade {
         }
 
         private void addExtendsRelation(String sourceTypeKey, Type superClassType, int position) {
-            if (superClassType == null) {
-                return;
-            }
-            pendingTypeRelations.add(new PendingTypeRelation(
-                    sourceTypeKey,
-                    resolveTypeName(superClassType),
-                    RelationType.EXTENDS,
-                    "possible",
-                    relativeFilePath,
-                    compilationUnit.getLineNumber(position)
-            ));
+            addTypeRelation(sourceTypeKey, resolveTypeReference(superClassType), RelationType.EXTENDS, position);
         }
 
         @SuppressWarnings("unchecked")
         private void addImplementsRelations(String sourceTypeKey, List<Type> superInterfaceTypes, int position) {
             for (Type interfaceType : superInterfaceTypes) {
-                pendingTypeRelations.add(new PendingTypeRelation(
-                        sourceTypeKey,
-                        resolveTypeName(interfaceType),
-                        RelationType.IMPLEMENTS,
-                        "possible",
-                        relativeFilePath,
-                        compilationUnit.getLineNumber(position)
-                ));
+                addTypeRelation(sourceTypeKey, resolveTypeReference(interfaceType), RelationType.IMPLEMENTS, position);
             }
         }
 
@@ -675,20 +646,31 @@ public class JavaAnalysisFacade {
             if (referencedType == null) {
                 return;
             }
-            for (String rawTypeName : collectReferencedTypeNames(referencedType)) {
-                String resolvedTypeName = resolveTypeName(rawTypeName);
-                if (resolvedTypeName == null || resolvedTypeName.equals(sourceType.qualifiedName())) {
+            for (ResolvedTypeReference resolvedTypeReference : collectReferencedTypeReferences(referencedType)) {
+                if (resolvedTypeReference.qualifiedName().equals(sourceType.qualifiedName())) {
                     continue;
                 }
-                pendingTypeRelations.add(new PendingTypeRelation(
-                        sourceType.symbolKey(),
-                        resolvedTypeName,
-                        RelationType.USES_TYPE,
-                        "possible",
-                        relativeFilePath,
-                        compilationUnit.getLineNumber(position)
-                ));
+                addTypeRelation(sourceType.symbolKey(), resolvedTypeReference, RelationType.USES_TYPE, position);
             }
+        }
+
+        private void addTypeRelation(
+                String sourceSymbolKey,
+                ResolvedTypeReference resolvedTypeReference,
+                RelationType relationType,
+                int position
+        ) {
+            if (resolvedTypeReference == null || resolvedTypeReference.qualifiedName() == null || resolvedTypeReference.qualifiedName().isBlank()) {
+                return;
+            }
+            pendingTypeRelations.add(new PendingTypeRelation(
+                    sourceSymbolKey,
+                    resolvedTypeReference.qualifiedName(),
+                    relationType,
+                    resolvedTypeReference.confidence(),
+                    relativeFilePath,
+                    compilationUnit.getLineNumber(position)
+            ));
         }
 
         @SuppressWarnings("unchecked")
@@ -723,6 +705,10 @@ public class JavaAnalysisFacade {
             if (type == null || type.isPrimitiveType()) {
                 return null;
             }
+            String bindingBackedTypeName = normalizeQualifiedTypeName(type.resolveBinding());
+            if (bindingBackedTypeName != null && !bindingBackedTypeName.isBlank()) {
+                return bindingBackedTypeName;
+            }
             return resolveTypeName(type.toString());
         }
 
@@ -752,28 +738,78 @@ public class JavaAnalysisFacade {
             return wildcardImports.iterator().next() + "." + normalizedTypeName;
         }
 
-        private Set<String> collectReferencedTypeNames(Type type) {
-            LinkedHashSet<String> typeNames = new LinkedHashSet<>();
+        private Set<ResolvedTypeReference> collectReferencedTypeReferences(Type type) {
+            LinkedHashMap<String, ResolvedTypeReference> typeReferencesByQualifiedName = new LinkedHashMap<>();
             type.accept(new ASTVisitor() {
                 @Override
                 public boolean visit(SimpleType node) {
-                    typeNames.add(node.getName().getFullyQualifiedName());
+                    mergeResolvedTypeReference(
+                            typeReferencesByQualifiedName,
+                            resolveTypeReference(node.resolveBinding(), node.getName().getFullyQualifiedName())
+                    );
                     return false;
                 }
 
                 @Override
                 public boolean visit(QualifiedType node) {
-                    typeNames.add(node.toString());
+                    mergeResolvedTypeReference(
+                            typeReferencesByQualifiedName,
+                            resolveTypeReference(node.resolveBinding(), node.toString())
+                    );
                     return false;
                 }
 
                 @Override
                 public boolean visit(NameQualifiedType node) {
-                    typeNames.add(node.toString());
+                    mergeResolvedTypeReference(
+                            typeReferencesByQualifiedName,
+                            resolveTypeReference(node.resolveBinding(), node.toString())
+                    );
                     return false;
                 }
             });
-            return typeNames;
+            if (typeReferencesByQualifiedName.isEmpty()) {
+                mergeResolvedTypeReference(typeReferencesByQualifiedName, resolveTypeReference(type.resolveBinding(), type.toString()));
+            }
+            return new LinkedHashSet<>(typeReferencesByQualifiedName.values());
+        }
+
+        private void mergeResolvedTypeReference(
+                Map<String, ResolvedTypeReference> typeReferencesByQualifiedName,
+                ResolvedTypeReference resolvedTypeReference
+        ) {
+            if (resolvedTypeReference == null) {
+                return;
+            }
+            ResolvedTypeReference current = typeReferencesByQualifiedName.get(resolvedTypeReference.qualifiedName());
+            if (current == null || ("possible".equals(current.confidence()) && "exact".equals(resolvedTypeReference.confidence()))) {
+                typeReferencesByQualifiedName.put(resolvedTypeReference.qualifiedName(), resolvedTypeReference);
+            }
+        }
+
+        private ResolvedTypeReference resolveTypeReference(Type type) {
+            if (type == null || type.isPrimitiveType()) {
+                return null;
+            }
+            return resolveTypeReference(type.resolveBinding(), type.toString());
+        }
+
+        private ResolvedTypeReference resolveTypeReference(ITypeBinding binding, String rawTypeName) {
+            if (binding != null && binding.getErasure() != null && binding.getErasure().isPrimitive()) {
+                return null;
+            }
+            String bindingBackedTypeName = normalizeQualifiedTypeName(binding);
+            if (bindingBackedTypeName != null && !bindingBackedTypeName.isBlank()) {
+                if (PRIMITIVE_TYPE_NAMES.contains(bindingBackedTypeName)) {
+                    return null;
+                }
+                return new ResolvedTypeReference(bindingBackedTypeName, "exact");
+            }
+            String fallbackTypeName = resolveTypeName(rawTypeName);
+            if (fallbackTypeName == null || fallbackTypeName.isBlank()) {
+                return null;
+            }
+            return new ResolvedTypeReference(fallbackTypeName, "possible");
         }
 
         private String stripGenericSuffix(String typeName) {
@@ -795,11 +831,11 @@ public class JavaAnalysisFacade {
         }
 
         private void registerVisibleType(Map<String, String> visibleTypesByName, String identifier, Type declaredType) {
-            String resolvedTypeName = resolveTypeName(declaredType);
-            if (resolvedTypeName == null) {
+            ResolvedTypeReference resolvedTypeReference = resolveTypeReference(declaredType);
+            if (resolvedTypeReference == null) {
                 return;
             }
-            visibleTypesByName.put(identifier, resolvedTypeName);
+            visibleTypesByName.put(identifier, resolvedTypeReference.qualifiedName());
         }
 
         private PendingMethodCall resolveMethodInvocation(MethodInvocation node, MethodContext methodContext) {
@@ -820,6 +856,7 @@ public class JavaAnalysisFacade {
                         methodContext.symbolKey(),
                         fallbackTargetType,
                         node.getName().getIdentifier(),
+                        null,
                         node.arguments().size(),
                         "possible",
                         relativeFilePath,
@@ -852,7 +889,8 @@ public class JavaAnalysisFacade {
                 return resolveQualifiedNameTargetType(qualifiedName);
             }
             if (expression instanceof ClassInstanceCreation classInstanceCreation) {
-                return resolveTypeName(classInstanceCreation.getType());
+                ResolvedTypeReference resolvedTypeReference = resolveTypeReference(classInstanceCreation.getType());
+                return resolvedTypeReference == null ? null : resolvedTypeReference.qualifiedName();
             }
             return null;
         }
@@ -917,6 +955,7 @@ public class JavaAnalysisFacade {
                     declarationBinding.getName() == null || declarationBinding.getName().isBlank()
                             ? fallbackMethodName
                             : declarationBinding.getName(),
+                    normalizeParameterTypeNames(declarationBinding.getParameterTypes()),
                     declarationBinding.getParameterTypes() == null
                             ? fallbackArgumentCount
                             : declarationBinding.getParameterTypes().length,
@@ -924,6 +963,52 @@ public class JavaAnalysisFacade {
                     relativeFilePath,
                     compilationUnit.getLineNumber(sourcePosition)
             );
+        }
+
+        private List<String> resolveMethodLookupParameterTypes(MethodDeclaration node) {
+            IMethodBinding methodBinding = node.resolveBinding();
+            if (methodBinding != null) {
+                IMethodBinding declarationBinding = methodBinding.getMethodDeclaration();
+                List<String> bindingBackedParameterTypes = normalizeParameterTypeNames(declarationBinding.getParameterTypes());
+                if (bindingBackedParameterTypes.size() == node.parameters().size()) {
+                    return bindingBackedParameterTypes;
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            List<SingleVariableDeclaration> parameters = node.parameters();
+            List<String> fallbackParameterTypes = new ArrayList<>(parameters.size());
+            for (SingleVariableDeclaration parameter : parameters) {
+                fallbackParameterTypes.add(resolveLookupTypeName(parameter.getType()));
+            }
+            return List.copyOf(fallbackParameterTypes);
+        }
+
+        private List<String> normalizeParameterTypeNames(ITypeBinding[] parameterTypes) {
+            if (parameterTypes == null || parameterTypes.length == 0) {
+                return List.of();
+            }
+            List<String> normalizedParameterTypes = new ArrayList<>(parameterTypes.length);
+            for (ITypeBinding parameterType : parameterTypes) {
+                String normalizedParameterType = normalizeQualifiedTypeName(parameterType);
+                if (normalizedParameterType == null || normalizedParameterType.isBlank()) {
+                    normalizedParameterType = parameterType == null ? "<unknown>" : normalizeRawTypeName(parameterType.getName());
+                }
+                normalizedParameterTypes.add(normalizedParameterType);
+            }
+            return List.copyOf(normalizedParameterTypes);
+        }
+
+        private String resolveLookupTypeName(Type type) {
+            String bindingBackedTypeName = normalizeQualifiedTypeName(type.resolveBinding());
+            if (bindingBackedTypeName != null && !bindingBackedTypeName.isBlank()) {
+                return bindingBackedTypeName;
+            }
+            String resolvedTypeName = resolveTypeName(type);
+            if (resolvedTypeName != null && !resolvedTypeName.isBlank()) {
+                return resolvedTypeName;
+            }
+            return normalizeRawTypeName(type.toString());
         }
 
         private String normalizeQualifiedTypeName(ITypeBinding typeBinding) {
@@ -943,6 +1028,11 @@ public class JavaAnalysisFacade {
                 return null;
             }
             return qualifiedName.replace('$', '.');
+        }
+
+        private String normalizeRawTypeName(String rawTypeName) {
+            String withoutGenerics = rawTypeName.replaceAll("<.*>", "");
+            return withoutGenerics.replace("...", "[]").trim();
         }
     }
 
@@ -975,10 +1065,100 @@ public class JavaAnalysisFacade {
             String sourceMethodSymbolKey,
             String targetTypeQualifiedName,
             String targetMethodName,
+            List<String> targetParameterTypes,
             int argumentCount,
             String confidence,
             String filePath,
             Integer sourceLine
     ) {
+    }
+
+    private record ResolvedTypeReference(
+            String qualifiedName,
+            String confidence
+    ) {
+    }
+
+    private record MethodDeclarationReference(
+            String symbolKey,
+            String ownerQualifiedTypeName,
+            String methodName,
+            List<String> parameterTypes
+    ) {
+    }
+
+    private static final class MethodSymbolIndex {
+
+        private final Map<String, String> symbolKeyByExactSignature;
+        private final Map<String, List<String>> symbolKeysByArity;
+
+        private MethodSymbolIndex(
+                Map<String, String> symbolKeyByExactSignature,
+                Map<String, List<String>> symbolKeysByArity
+        ) {
+            this.symbolKeyByExactSignature = symbolKeyByExactSignature;
+            this.symbolKeysByArity = symbolKeysByArity;
+        }
+
+        private static MethodSymbolIndex build(List<MethodDeclarationReference> methodDeclarations) {
+            Map<String, String> symbolKeyByExactSignature = new HashMap<>();
+            Map<String, List<String>> symbolKeysByArity = new HashMap<>();
+            for (MethodDeclarationReference methodDeclaration : methodDeclarations) {
+                symbolKeyByExactSignature.put(
+                        exactMethodIndexKey(
+                                methodDeclaration.ownerQualifiedTypeName(),
+                                methodDeclaration.methodName(),
+                                methodDeclaration.parameterTypes()
+                        ),
+                        methodDeclaration.symbolKey()
+                );
+                symbolKeysByArity.computeIfAbsent(
+                        arityMethodIndexKey(
+                                methodDeclaration.ownerQualifiedTypeName(),
+                                methodDeclaration.methodName(),
+                                methodDeclaration.parameterTypes().size()
+                        ),
+                        ignored -> new ArrayList<>()
+                ).add(methodDeclaration.symbolKey());
+            }
+            Map<String, List<String>> stableArityMap = new HashMap<>();
+            for (Map.Entry<String, List<String>> entry : symbolKeysByArity.entrySet()) {
+                stableArityMap.put(entry.getKey(), List.copyOf(entry.getValue()));
+            }
+            return new MethodSymbolIndex(Map.copyOf(symbolKeyByExactSignature), Map.copyOf(stableArityMap));
+        }
+
+        private String resolve(PendingMethodCall methodCall) {
+            if (methodCall.targetParameterTypes() != null) {
+                String exactMatch = symbolKeyByExactSignature.get(
+                        exactMethodIndexKey(
+                                methodCall.targetTypeQualifiedName(),
+                                methodCall.targetMethodName(),
+                                methodCall.targetParameterTypes()
+                        )
+                );
+                if (exactMatch != null) {
+                    return exactMatch;
+                }
+            }
+
+            List<String> arityMatches = symbolKeysByArity.getOrDefault(
+                    arityMethodIndexKey(
+                            methodCall.targetTypeQualifiedName(),
+                            methodCall.targetMethodName(),
+                            methodCall.argumentCount()
+                    ),
+                    List.of()
+            );
+            return arityMatches.size() == 1 ? arityMatches.get(0) : null;
+        }
+    }
+
+    private static String exactMethodIndexKey(String ownerQualifiedTypeName, String methodName, List<String> parameterTypes) {
+        return ownerQualifiedTypeName + "|" + methodName + "|" + String.join(",", parameterTypes);
+    }
+
+    private static String arityMethodIndexKey(String ownerQualifiedTypeName, String methodName, int arity) {
+        return ownerQualifiedTypeName + "|" + methodName + "|" + arity;
     }
 }

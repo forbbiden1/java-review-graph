@@ -82,11 +82,13 @@
 - 类型符号
 - 方法符号
 - `declares`、`extends`、`implements`、`uses_type` 关系
-- 在同一个类内部、按方法名和参数个数可匹配的本地 `calls` 关系
+- 当 JDT 能解析目标时，优先产出基于 binding 的 `extends`、`implements`、`uses_type` 关系
+- 当方法 binding 或稳定的“所属类型 + 方法签名”匹配可用时，支持跨类型 `calls` 关系
 - 当服务端传入显式重建列表时，只扫描指定的 Java 文件子集
 
 当前限制：
 
-- 还没有做 binding 解析
-- 还没有做跨类型方法调用解析
+- binding 质量仍然依赖本地源码和 classpath 是否完整
+- 对于第三方依赖或 classpath 不完整的目标，仍会回退为较低置信度的关系输出
+- 重载和派发解析当前优先使用声明目标签名，还不是运行时多态解析
 - impact 传播仍然在服务端编排层完成，而不是在分析器模块内部完成

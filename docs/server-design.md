@@ -24,6 +24,17 @@ The current persistence target is a local SQLite database file.
 - `infrastructure`
   persistence, file access, and analyzer integration adapters
 
+Current application-layer split:
+
+- `ProjectIndexService`
+  top-level indexing use case orchestration
+- `IncrementalPlanner`
+  changed-file resolution, incremental fallback rules, and rebuild scope planning
+- `SnapshotAssembler`
+  merge rebuilt analyzer output with unchanged snapshot state
+- `ChangeStatusCalculator`
+  symbol diff status and impacted-symbol derivation
+
 ## Main Use Cases
 
 ### Project import

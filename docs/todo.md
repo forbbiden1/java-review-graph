@@ -62,7 +62,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
   Done when low, medium, and high risk levels are derived from stored signals and graph evidence.
 - [x] Add symbol path and impact trace queries.
   Done when the UI can show dependency or call paths between review-relevant symbols.
-- [ ] Add Markdown review report export.
+- [x] Add Markdown review report export.
   Done when one analysis run can be exported as a shareable review summary.
 - [x] Add historical snapshot comparison.
   Done for symbol-level evolution when two snapshots can show added, deleted, API-modified, and implementation-modified symbols side by side.

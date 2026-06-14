@@ -594,10 +594,12 @@ export function SnapshotComparePanel({
 
 type ChangeSetReviewPanelProps = {
   changedFiles: string[] | null;
+  copyMarkdownLabel: string;
   emptyBody: string;
   emptyTitle: string;
   language: LanguageMode;
   markdownLabel: string;
+  onCopyMarkdown: () => void;
   report: ChangeSetReviewMarkdownReport | null;
   result: ChangeSetReviewResult | null;
   reviewSourceLabel: string;
@@ -609,10 +611,12 @@ type ChangeSetReviewPanelProps = {
 
 export function ChangeSetReviewPanel({
   changedFiles,
+  copyMarkdownLabel,
   emptyBody,
   emptyTitle,
   language,
   markdownLabel,
+  onCopyMarkdown,
   report,
   result,
   reviewSourceLabel,
@@ -775,7 +779,12 @@ export function ChangeSetReviewPanel({
         <section className="review-report-section">
           <div className="diagnostic-path-header">
             <strong>{markdownLabel}</strong>
-            <span>{report.fileName}</span>
+            <div className="panel-header-actions">
+              <span>{report.fileName}</span>
+              <button type="button" className="secondary-button" onClick={onCopyMarkdown}>
+                {copyMarkdownLabel}
+              </button>
+            </div>
           </div>
           <pre className="review-markdown-preview">{report.markdown}</pre>
         </section>

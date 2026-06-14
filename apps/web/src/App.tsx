@@ -52,6 +52,7 @@ import {
 import {
   buildGraphSceneStorageKey,
   buildSnapshotGroups,
+  copyTextToClipboard,
   downloadMarkdownReport,
   filterClassGraph,
   findSnapshotGroupKey,
@@ -588,6 +589,20 @@ function App() {
       setErrorMessage(toMessage(error, copy.messages.unexpectedError));
     } finally {
       setExportingReviewMarkdown(false);
+    }
+  }
+
+  async function handleCopyChangeSetReviewMarkdown() {
+    if (!reviewMarkdownReport) {
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      await copyTextToClipboard(reviewMarkdownReport.markdown);
+      setWorkspaceMessage(copy.messages.markdownCopied(reviewMarkdownReport.fileName));
+    } catch (error) {
+      setErrorMessage(toMessage(error, copy.messages.clipboardUnavailable));
     }
   }
 
@@ -1354,10 +1369,12 @@ function App() {
 
                   <ChangeSetReviewPanel
                     changedFiles={reviewChangeSource === "manual" ? reviewManualChangedFiles : null}
+                    copyMarkdownLabel={copy.buttons.copyMarkdown}
                     emptyBody={copy.copy.reviewExportEmptyBody}
                     emptyTitle={copy.copy.reviewExportEmptyTitle}
                     language={settings.language}
                     markdownLabel={copy.copy.reviewMarkdownLabel}
+                    onCopyMarkdown={() => void handleCopyChangeSetReviewMarkdown()}
                     report={reviewMarkdownReport}
                     result={reviewResult}
                     symbolPath={symbolPathResult}

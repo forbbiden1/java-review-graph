@@ -43,6 +43,7 @@ export type AppCopy = {
     cancel: string;
     close: string;
     commitRange: string;
+    copyMarkdown: string;
     deleteProject: string;
     expand: string;
     gitAuto: string;
@@ -113,9 +114,11 @@ export type AppCopy = {
     settingsSubtitle: string;
   };
   messages: {
+    clipboardUnavailable: string;
     classExpanded: (name: string, count: number) => string;
     confirmDeleteProject: (name: string) => string;
     indexFinished: (name: string, typeCount: number, methodCount: number, relationCount: number) => string;
+    markdownCopied: (fileName: string) => string;
     markdownExported: (fileName: string) => string;
     projectDeleted: (name: string) => string;
     projectReady: (name: string) => string;
@@ -180,7 +183,7 @@ const EN_COPY: AppCopy = {
     indexControlTitle: "Index Control",
     methodGraphTitle: "Method Graph",
     projectsTitle: "Projects",
-    reviewExportSubtitle: "Run change-set review on the selected snapshot and export a Markdown summary.",
+    reviewExportSubtitle: "Run change-set review on the selected snapshot, then preview, copy, or export a Markdown summary.",
     reviewExportTitle: "Change-Set Review",
     reviewNotesSubtitle: "Current scope and implementation limits.",
     reviewNotesTitle: "Review Notes",
@@ -202,6 +205,7 @@ const EN_COPY: AppCopy = {
     cancel: "Cancel",
     close: "Close",
     commitRange: "Commit Range",
+    copyMarkdown: "Copy Markdown",
     deleteProject: "Delete Project",
     expand: "Expand",
     gitAuto: "Git Auto",
@@ -279,10 +283,12 @@ const EN_COPY: AppCopy = {
     settingsSubtitle: "Desktop preferences and language controls."
   },
   messages: {
+    clipboardUnavailable: "Clipboard is unavailable in this environment.",
     classExpanded: (name, count) => `Expanded ${name} with ${count} methods.`,
     confirmDeleteProject: (name) => `Delete project ${name}? This removes its snapshots and stored review data.`,
     indexFinished: (name, typeCount, methodCount, relationCount) =>
       `Index finished for ${name}: ${typeCount} classes, ${methodCount} methods, ${relationCount} relations.`,
+    markdownCopied: (fileName) => `Copied Markdown report: ${fileName}.`,
     markdownExported: (fileName) => `Markdown report ready: ${fileName}.`,
     projectDeleted: (name) => `Deleted project ${name}.`,
     projectReady: (name) => `Project ${name} is ready. Run an index to populate the first snapshot.`,
@@ -490,18 +496,21 @@ ZH_COPY.states.deletingProject = "删除中...";
 ZH_COPY.states.exportingMarkdown = "导出中...";
 ZH_COPY.states.reviewing = "分析中...";
 ZH_COPY.buttons.back = "返回";
+ZH_COPY.buttons.copyMarkdown = "复制 Markdown";
 ZH_COPY.buttons.deleteProject = "删除项目";
 ZH_COPY.buttons.expand = "展开";
 ZH_COPY.buttons.exportMarkdown = "导出 Markdown";
 ZH_COPY.buttons.runReview = "执行 Review";
 ZH_COPY.fields.reviewSource = "Review 来源";
 ZH_COPY.panels.reviewExportTitle = "Change-Set Review";
-ZH_COPY.panels.reviewExportSubtitle = "基于当前快照执行 change-set review，并导出 Markdown 报告。";
+ZH_COPY.panels.reviewExportSubtitle = "基于当前快照执行 change-set review，并预览、复制或导出 Markdown 报告。";
 ZH_COPY.copy.reviewExportEmptyTitle = "还没有报告";
 ZH_COPY.copy.reviewExportEmptyBody = "执行一次 change-set review，这里会显示风险、优先目标和 Markdown 预览。";
 ZH_COPY.copy.reviewMarkdownLabel = "Markdown 预览";
 ZH_COPY.copy.reviewTargetsLabel = "优先 Review 目标";
+ZH_COPY.messages.clipboardUnavailable = "当前环境无法访问剪贴板。";
 ZH_COPY.messages.confirmDeleteProject = (name) => `确认删除项目 ${name}？该项目的快照和已保存评审数据会一起删除。`;
+ZH_COPY.messages.markdownCopied = (fileName) => `Markdown 报告已复制到剪贴板：${fileName}。`;
 ZH_COPY.messages.markdownExported = (fileName) => `Markdown 报告已准备完成：${fileName}。`;
 ZH_COPY.messages.projectDeleted = (name) => `已删除项目 ${name}。`;
 ZH_COPY.messages.reviewFinished = (riskLevel, targetCount) => `change-set review 已完成，风险等级为 ${riskLevel}，优先目标 ${targetCount} 个。`;

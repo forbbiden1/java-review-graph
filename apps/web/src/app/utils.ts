@@ -177,6 +177,33 @@ export function downloadMarkdownReport(report: ChangeSetReviewMarkdownReport) {
   URL.revokeObjectURL(objectUrl);
 }
 
+export async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "0";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  document.body.append(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("Clipboard API is unavailable.");
+    }
+  } finally {
+    textarea.remove();
+  }
+}
+
 export function groupSymbolChanges(changes: SymbolChange[]) {
   const groups = new Map<string, SymbolChange[]>();
 

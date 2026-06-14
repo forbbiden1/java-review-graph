@@ -82,7 +82,7 @@ Current implementation notes:
 - large graphs now start in a progressive preview mode that keeps high-signal nodes first and lets the user switch to the full graph on demand, reducing initial layout pressure for very large snapshots
 - Vite proxies `/api` to `http://localhost:8080` for local development
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
-- the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
+- the right-side inspector now also runs change-set review, shows deterministic risk and review targets, previews the generated Markdown, copies it to clipboard, and downloads a shareable report
 - the change-set review controls are independent from indexing controls and support Git auto, manual file lists, and explicit commit-range inputs
 - incremental indexing now also exposes a small impact-depth control so demos can compare one-hop and multi-hop impacted-symbol expansion
 - the same review panel now surfaces structured risk factors with score contribution and evidence, so interview demos can explain exactly why one change set is low, medium, or high risk

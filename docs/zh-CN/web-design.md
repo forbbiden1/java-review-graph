@@ -69,6 +69,7 @@
 - 类图和方法图复用同一套图渲染器与场景持久化逻辑
 - 图谱渲染器现在采用懒加载，主入口包更小，图谱 chunk 会在需要时再加载
 - ELK 布局代码现在会作为独立 worker 资源输出，交互层图谱 chunk 体积进一步下降
+- React Flow 及相关图交互依赖会拆到独立的 `graph-flow` vendor chunk，启动代码与画布交互代码保持分离
 - 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`
 - 当前 UI 已接入现有后端接口和 SQLite 快照数据
 - 右侧检查面板现在还可以执行 change-set review、展示确定性的风险与优先目标，并导出 Markdown 报告

@@ -32,3 +32,21 @@
 - render class graph in the web UI
 - expand selected class into method nodes
 - highlight changed and impacted nodes
+
+## Milestone 5
+
+- support commit-range or change-set based review analysis
+- map Git changes to changed and impacted symbols
+- expose review summary APIs for one change set
+
+## Milestone 6
+
+- add risk scoring and explainable review rules
+- support symbol path queries and propagation tracing
+- present review focus and impact reasoning in the UI
+
+## Milestone 7
+
+- export review reports in Markdown-first form
+- compare historical snapshots and relation evolution
+- add AI-assisted review explanations on top of graph evidence

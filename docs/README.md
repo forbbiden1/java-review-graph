@@ -31,7 +31,9 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
     Local development setup and current build notes.
 12. [roadmap.md](./roadmap.md)
     Milestone order.
-13. [todo.md](./todo.md)
+13. [campus-project-plan.md](./campus-project-plan.md)
+    Showcase positioning, high-value features, and a recruiting-oriented delivery plan.
+14. [todo.md](./todo.md)
     Prioritized post-MVP follow-up work.
 
 ## Document Roles
@@ -45,7 +47,7 @@ Chinese documentation is available at [zh-CN/README.md](./zh-CN/README.md).
 - Frontend:
   `web-design.md`, `graph-reactflow-elk-migration.md`
 - Execution support:
-  `dev-setup.md`, `roadmap.md`, `todo.md`
+  `dev-setup.md`, `roadmap.md`, `campus-project-plan.md`, `todo.md`
 
 ## Current Rule
 

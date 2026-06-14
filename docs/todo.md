@@ -54,6 +54,21 @@ The focus is accuracy first, then maintainability, then performance and polish.
 - [x] Add an indexing diagnostics panel in the UI.
   Done when users can inspect snapshot source, changed files, fallback reasons, and rebuild scope without reading logs.
 
+## P1: Showcase Features
+
+- [ ] Add Git change-set review analysis.
+  Done when one commit range or diff base can produce changed-symbol, impacted-symbol, and review-summary output.
+- [ ] Add explainable change risk scoring.
+  Done when low, medium, and high risk levels are derived from stored signals and graph evidence.
+- [ ] Add symbol path and impact trace queries.
+  Done when the UI can show dependency or call paths between review-relevant symbols.
+- [ ] Add Markdown review report export.
+  Done when one analysis run can be exported as a shareable review summary.
+- [ ] Add historical snapshot comparison.
+  Done when two snapshots can show symbol and relation evolution side by side.
+- [ ] Add AI-assisted review explanation.
+  Done when graph-derived evidence can be summarized into readable review notes and test suggestions.
+
 ## P2: SQLite and Persistence
 
 - [x] Review and add database indexes for high-frequency queries.
@@ -73,7 +88,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 ## P2: Documentation Sync
 
-- [ ] Update `roadmap.md` to reflect the current Electron desktop, Git auto incremental mode, and snapshot grouping behavior.
+- [x] Update `roadmap.md` to reflect the current Electron desktop direction and post-MVP showcase milestones.
 - [ ] Add a troubleshooting guide.
   Focus on unsupported project import, backend connection failure, incremental fallback reasons, and graph readability issues.
 - [ ] Keep API and indexing docs aligned with implementation changes.

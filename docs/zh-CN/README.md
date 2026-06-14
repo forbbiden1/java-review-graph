@@ -29,7 +29,9 @@
     本地开发环境说明和当前构建注意事项。
 12. [roadmap.md](./roadmap.md)
     里程碑顺序。
-13. [todo.md](./todo.md)
+13. [campus-project-plan.md](./campus-project-plan.md)
+    校招展示定位、高价值功能和分阶段开发计划。
+14. [todo.md](./todo.md)
     按优先级整理的 MVP 后续待办。
 
 ## 文档分工
@@ -43,7 +45,7 @@
 - 前端：
   `web-design.md`、`graph-reactflow-elk-migration.md`
 - 开发辅助：
-  `dev-setup.md`、`roadmap.md`、`todo.md`
+  `dev-setup.md`、`roadmap.md`、`campus-project-plan.md`、`todo.md`
 
 ## 维护规则
 

@@ -673,6 +673,32 @@ export function ChangeSetReviewPanel({
 
       <section className="review-report-section">
         <div className="diagnostic-path-header">
+          <strong>Risk Factors</strong>
+          <span>{result.risk.factors.length}</span>
+        </div>
+        <div className="list-stack">
+          {result.risk.factors.map((factor) => (
+            <article key={factor.code} className={`change-card ${normalizeRiskStatusClass(factor.severity)}`}>
+              <div className="change-head">
+                <span className={`status-pill ${normalizeRiskStatusClass(factor.severity)}`}>{factor.severity}</span>
+                <code>+{factor.score}</code>
+              </div>
+              <strong>{factor.summary}</strong>
+              <p>{factor.code}</p>
+              {factor.evidence.length > 0 ? (
+                <ul className="review-report-reasons">
+                  {factor.evidence.map((evidence) => (
+                    <li key={`${factor.code}:${evidence}`}>{evidence}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="review-report-section">
+        <div className="diagnostic-path-header">
           <strong>Propagation Paths</strong>
           <span>{result.propagationPaths.length}</span>
         </div>

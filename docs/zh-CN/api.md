@@ -194,6 +194,7 @@
 - 提交区间模式会拒绝只传一端 commit，且不能与 `manual` 手工文件列表混用
 - 提交区间模式基于两端 commit 的 `git diff --name-status --find-renames` 收集变更文件和重命名路径，不会带入当前工作区未提交改动
 - 返回变更符号、受影响符号、优先 review 目标、传播路径、测试关注建议和确定性风险摘要
+- 风险结果同时保留兼容性的 `risk.reasons` 和结构化的 `risk.factors`，后者会给出规则代码、分值贡献、严重级别和证据文本
 
 ## `POST /api/projects/{projectId}/review/change-set/markdown`
 
@@ -202,4 +203,4 @@
 当前行为：
 
 - 请求体与 `POST /api/projects/{projectId}/review/change-set` 相同
-- 基于同一套确定性 review 结果生成 Markdown 正文和建议文件名
+- 基于同一套确定性 review 结果生成 Markdown 正文和建议文件名，并带上结构化风险因子说明

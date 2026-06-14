@@ -89,10 +89,19 @@ export type ChangeSetReviewSymbol = {
   reviewRole: string;
 };
 
+export type ChangeSetRiskFactor = {
+  code: string;
+  summary: string;
+  score: number;
+  severity: string;
+  evidence: string[];
+};
+
 export type ChangeSetReviewRisk = {
   level: string;
   score: number;
   reasons: string[];
+  factors: ChangeSetRiskFactor[];
 };
 
 export type ChangeSetPropagationPath = {

@@ -67,6 +67,9 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.risk.level").value("medium"))
                 .andExpect(jsonPath("$.risk.score").value(4))
                 .andExpect(jsonPath("$.risk.reasons[0]").value("Public API or deleted symbol changed."))
+                .andExpect(jsonPath("$.risk.factors[0].code").value("public_api_or_deleted_symbol"))
+                .andExpect(jsonPath("$.risk.factors[0].score").value(3))
+                .andExpect(jsonPath("$.risk.factors[0].evidence[0]").value("`demo.Service` is `modified_api`."))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));
     }
 
@@ -104,6 +107,8 @@ class ChangeSetReviewIntegrationTest {
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Prioritized Review Targets")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Propagation Paths")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("## Test Focus Suggestions")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("- Factors:")))
+                .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("`public_api_or_deleted_symbol` +3 [high] Public API or deleted symbol changed.")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Changed public API should be covered by direct contract tests.")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("`demo.ServiceExport` -> `demo.ControllerExport` via `uses_type`")))
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Risk level: medium.")));

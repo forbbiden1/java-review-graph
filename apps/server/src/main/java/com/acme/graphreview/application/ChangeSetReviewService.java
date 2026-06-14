@@ -205,37 +205,78 @@ public class ChangeSetReviewService {
             int changedFileCount
     ) {
         int riskScore = 0;
-        LinkedHashSet<String> reasons = new LinkedHashSet<>();
+        List<ChangeSetRiskFactor> factors = new java.util.ArrayList<>();
 
         boolean publicApiChanged = changedSymbols.stream()
                 .anyMatch(symbol -> "modified_api".equals(symbol.status()) || "deleted".equals(symbol.status()));
         if (publicApiChanged) {
             riskScore += 3;
-            reasons.add("Public API or deleted symbol changed.");
+            factors.add(new ChangeSetRiskFactor(
+                    "public_api_or_deleted_symbol",
+                    "Public API or deleted symbol changed.",
+                    3,
+                    "high",
+                    buildSymbolEvidence(changedSymbols, "modified_api", "deleted")
+            ));
         }
 
         if (impactedSymbols.size() >= 3) {
             riskScore += 2;
-            reasons.add("At least 3 impacted symbols were found.");
+            factors.add(new ChangeSetRiskFactor(
+                    "fanout_impacted_symbols",
+                    "At least 3 impacted symbols were found.",
+                    2,
+                    "medium",
+                    List.of(impactedSymbols.size() + " impacted symbol(s) are connected to this change set.")
+            ));
         } else if (!impactedSymbols.isEmpty()) {
             riskScore += 1;
-            reasons.add("One-hop impacted symbols were found.");
+            factors.add(new ChangeSetRiskFactor(
+                    "one_hop_impacted_symbol",
+                    "One-hop impacted symbols were found.",
+                    1,
+                    "medium",
+                    buildSymbolEvidence(impactedSymbols)
+            ));
         }
 
         boolean deletedSymbols = persistedChanges.stream()
                 .anyMatch(change -> "deleted".equalsIgnoreCase(change.changeType()));
         if (deletedSymbols) {
             riskScore += 2;
-            reasons.add("Deleted symbols require extra review.");
+            factors.add(new ChangeSetRiskFactor(
+                    "deleted_symbol",
+                    "Deleted symbols require extra review.",
+                    2,
+                    "high",
+                    persistedChanges.stream()
+                            .filter(change -> "deleted".equalsIgnoreCase(change.changeType()))
+                            .map(change -> "Deleted symbol key `" + change.symbolKey() + "` was recorded in the snapshot diff.")
+                            .distinct()
+                            .limit(3)
+                            .toList()
+            ));
         }
 
         if (changedFileCount > 0 && changedSymbols.isEmpty()) {
             riskScore += 1;
-            reasons.add("Changed files did not map to indexed symbols.");
+            factors.add(new ChangeSetRiskFactor(
+                    "unmapped_changed_files",
+                    "Changed files did not map to indexed symbols.",
+                    1,
+                    "low",
+                    List.of(changedFileCount + " changed file(s) were collected, but none matched indexed symbols in the selected snapshot.")
+            ));
         }
 
-        if (reasons.isEmpty()) {
-            reasons.add("Only implementation-local changes were found in the selected snapshot.");
+        if (factors.isEmpty()) {
+            factors.add(new ChangeSetRiskFactor(
+                    "implementation_local_change",
+                    "Only implementation-local changes were found in the selected snapshot.",
+                    0,
+                    "low",
+                    List.of("No public API, deletion, fan-out, or unmapped-file risk rule matched.")
+            ));
         }
 
         String riskLevel;
@@ -247,7 +288,22 @@ public class ChangeSetReviewService {
             riskLevel = "low";
         }
 
-        return new ChangeSetRiskSummary(riskLevel, riskScore, List.copyOf(reasons));
+        List<String> reasons = factors.stream()
+                .map(ChangeSetRiskFactor::summary)
+                .distinct()
+                .toList();
+        return new ChangeSetRiskSummary(riskLevel, riskScore, reasons, List.copyOf(factors));
+    }
+
+    private List<String> buildSymbolEvidence(List<ChangeSetReviewSymbol> symbols, String... statuses) {
+        Set<String> statusSet = java.util.Arrays.stream(statuses)
+                .collect(java.util.stream.Collectors.toSet());
+        return symbols.stream()
+                .filter(symbol -> statusSet.isEmpty() || statusSet.contains(symbol.status()))
+                .map(symbol -> "`" + symbol.qualifiedName() + "` is `" + symbol.status() + "`.")
+                .distinct()
+                .limit(3)
+                .toList();
     }
 
     private List<ChangeSetReviewSymbol> buildReviewTargets(
@@ -313,6 +369,15 @@ public class ChangeSetReviewService {
         markdown.append("- Reasons:\n");
         for (String reason : result.risk().reasons()) {
             markdown.append("  - ").append(reason).append("\n");
+        }
+        markdown.append("- Factors:\n");
+        for (ChangeSetRiskFactor factor : result.risk().factors()) {
+            markdown.append("  - `").append(factor.code()).append("` +").append(factor.score())
+                    .append(" [").append(factor.severity()).append("] ")
+                    .append(factor.summary()).append("\n");
+            for (String evidence : factor.evidence()) {
+                markdown.append("    - ").append(evidence).append("\n");
+            }
         }
         markdown.append("\n");
         appendPathSection(markdown, "Changed Files", result.changedFiles());
@@ -517,7 +582,17 @@ public class ChangeSetReviewService {
     public record ChangeSetRiskSummary(
             String riskLevel,
             int riskScore,
-            List<String> reasons
+            List<String> reasons,
+            List<ChangeSetRiskFactor> factors
+    ) {
+    }
+
+    public record ChangeSetRiskFactor(
+            String code,
+            String summary,
+            int score,
+            String severity,
+            List<String> evidence
     ) {
     }
 

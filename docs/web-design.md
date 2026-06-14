@@ -84,6 +84,7 @@ Current implementation notes:
 - the UI is wired to the current backend endpoints and SQLite-backed snapshots
 - the right-side inspector now also runs change-set review, shows deterministic risk and review targets, and exports a Markdown report for sharing
 - the change-set review controls are independent from indexing controls and support Git auto, manual file lists, and explicit commit-range inputs
+- the same review panel now surfaces structured risk factors with score contribution and evidence, so interview demos can explain exactly why one change set is low, medium, or high risk
 - the change-set review panel also shows direct propagation paths so users can explain why one changed symbol affects a downstream review target
 - the same panel now highlights deterministic test-focus suggestions so the demo can end with concrete regression or integration targets
 - the same inspector now also supports snapshot-to-snapshot compare, so users can choose a baseline snapshot and inspect deterministic symbol diffs plus structural relation evolution before running review

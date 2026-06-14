@@ -1,6 +1,7 @@
 package com.acme.graphreview.api;
 
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewResult;
+import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetRiskFactor;
 import com.acme.graphreview.application.ChangeSetReviewService.ChangeSetReviewSymbol;
 import com.acme.graphreview.application.ChangeSetReviewService.PropagationPath;
 import com.acme.graphreview.application.ChangeSetReviewService.TestFocusSuggestion;
@@ -44,10 +45,34 @@ public record ChangeSetReviewResponse(
     public record RiskResponse(
             String level,
             int score,
-            List<String> reasons
+            List<String> reasons,
+            List<RiskFactorResponse> factors
     ) {
         private static RiskResponse from(com.acme.graphreview.application.ChangeSetReviewService.ChangeSetRiskSummary risk) {
-            return new RiskResponse(risk.riskLevel(), risk.riskScore(), risk.reasons());
+            return new RiskResponse(
+                    risk.riskLevel(),
+                    risk.riskScore(),
+                    risk.reasons(),
+                    risk.factors().stream().map(RiskFactorResponse::from).toList()
+            );
+        }
+    }
+
+    public record RiskFactorResponse(
+            String code,
+            String summary,
+            int score,
+            String severity,
+            List<String> evidence
+    ) {
+        private static RiskFactorResponse from(ChangeSetRiskFactor factor) {
+            return new RiskFactorResponse(
+                    factor.code(),
+                    factor.summary(),
+                    factor.score(),
+                    factor.severity(),
+                    factor.evidence()
+            );
         }
     }
 

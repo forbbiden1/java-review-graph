@@ -87,6 +87,9 @@ class ChangeSetReviewServiceTest {
         assertEquals(4, result.risk().riskScore());
         assertTrue(result.risk().reasons().contains("Public API or deleted symbol changed."));
         assertTrue(result.risk().reasons().contains("One-hop impacted symbols were found."));
+        assertEquals("public_api_or_deleted_symbol", result.risk().factors().get(0).code());
+        assertEquals(3, result.risk().factors().get(0).score());
+        assertEquals(List.of("`demo.Service` is `modified_api`."), result.risk().factors().get(0).evidence());
         assertEquals(changedType.symbolKey(), result.reviewTargets().get(0).symbolKey());
         assertEquals(1, result.propagationPaths().size());
         assertEquals("demo.Service", result.propagationPaths().get(0).fromSymbol().qualifiedName());
@@ -152,6 +155,7 @@ class ChangeSetReviewServiceTest {
         assertEquals("change-set-review-project-1-review-baseline-git.md", report.fileName());
         assertTrue(report.markdown().contains("# Change-Set Review Report"));
         assertTrue(report.markdown().contains("## Risk"));
+        assertTrue(report.markdown().contains("`public_api_or_deleted_symbol` +3 [high] Public API or deleted symbol changed."));
         assertTrue(report.markdown().contains("## Propagation Paths"));
         assertTrue(report.markdown().contains("## Test Focus Suggestions"));
         assertTrue(report.markdown().contains("Changed public API should be covered by direct contract tests."));

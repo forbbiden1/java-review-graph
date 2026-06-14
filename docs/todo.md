@@ -58,7 +58,7 @@ The focus is accuracy first, then maintainability, then performance and polish.
 
 - [x] Add Git change-set review analysis.
   Done when one commit range or diff base can produce changed-symbol, impacted-symbol, and review-summary output.
-- [ ] Add explainable change risk scoring.
+- [x] Add explainable change risk scoring.
   Done when low, medium, and high risk levels are derived from stored signals and graph evidence.
 - [ ] Add symbol path and impact trace queries.
   Done when the UI can show dependency or call paths between review-relevant symbols.
